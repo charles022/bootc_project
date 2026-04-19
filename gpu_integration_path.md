@@ -267,7 +267,6 @@ This architecture stays close to Fedora/bootc’s documented image-building mode
 
 ## Bottom line
 
-**Yes — this is the corrected final version I recommend.**
 
 
 * **Use `.kube` Quadlets with CDI selectors in the kube YAML**
@@ -275,7 +274,6 @@ This architecture stays close to Fedora/bootc’s documented image-building mode
 
 That keeps the whole thing on the most clearly documented path. ([Podman Documentation][2])
 
-I can turn this next into a single copy-paste-ready repo layout with the files exactly named and placed.
 
 [1]: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html?utm_source=chatgpt.com "Installing the NVIDIA Container Toolkit"
 [2]: https://docs.podman.io/en/latest/markdown/podman-kube-play.1.html?utm_source=chatgpt.com "podman-kube-play"
