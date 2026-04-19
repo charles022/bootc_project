@@ -1,14 +1,14 @@
-# Define the Quadlet-managed pod that contains the dev and backup containers. # Quadlet kube file
-[Unit] # begin unit section
-Description=Dev pod with dev container and backup sidecar # pod description
-After=network-online.target sshd.service nvidia-cdi-refresh.service # wait for host sshd and CDI refresh
-Wants=network-online.target # prefer network online
-Requires=nvidia-cdi-refresh.service # require CDI refresh before GPU pod start
+# Define the Quadlet-managed pod that contains the dev and backup containers.
+[Unit]
+Description=Dev pod with dev container and backup sidecar
+After=network-online.target sshd.service nvidia-cdi-refresh.service
+Wants=network-online.target
+Requires=nvidia-cdi-refresh.service
 
-# Point Quadlet at the pod manifest. # kube manifest reference
-[Kube] # begin kube section
-Yaml=/usr/share/containers/systemd/devpod.yaml # pod manifest path
+# Point Quadlet at the pod manifest.
+[Kube]
+Yaml=/usr/share/containers/systemd/devpod.yaml
 
-# Make the generated pod service part of normal boot. # auto-start pod at boot
-[Install] # begin install section
-WantedBy=multi-user.target # standard boot target
+# Make the generated pod service part of normal boot.
+[Install]
+WantedBy=multi-user.target

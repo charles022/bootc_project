@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 # run with python3
+#!/usr/bin/env python3
 
 # Import required modules for the startup smoke test. # import modules
 import sys # provide stderr and exits

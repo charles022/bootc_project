@@ -1,4 +1,4 @@
-#!/usr/bin/env bash # run with bash
+#!/usr/bin/env bash
 
 # Exit on errors, unset vars, and failed pipelines. # strict bash mode
 set -euo pipefail # strict execution

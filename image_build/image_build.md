@@ -22,39 +22,39 @@ gpu-bootc/                              # top-level project directory
 ## `Containerfile`
 
 ```dockerfile
-# Use Fedora bootc as the host operating system image. # host image base
-FROM quay.io/fedora/fedora-bootc:42 # bootc base image
+# Use Fedora bootc as the host operating system image.
+FROM quay.io/fedora/fedora-bootc:42
 
-# Install only the host packages we actually need. # host package install
-RUN dnf -y install \ # begin package install
-    openssh-server \ # provide host sshd
-    podman \ # provide podman and quadlet support
-    nvidia-container-toolkit-base \ # provide NVIDIA CDI refresh support
-    bash \ # provide shell for host scripts
-    coreutils \ # provide standard utilities
-    && dnf clean all # clean package metadata
+# Install only the host packages we actually need.
+RUN dnf -y install \
+    openssh-server \
+    podman \
+    nvidia-container-toolkit-base \
+    bash \
+    coreutils \
+    && dnf clean all
 
-# Create only the directories we need in the host image. # host directory setup
-RUN mkdir -p /usr/share/containers/systemd \ # Quadlet system path
-    && mkdir -p /usr/lib/systemd/system \ # systemd unit path
-    && mkdir -p /opt/project # host project path
+# Create only the directories we need in the host image.
+RUN mkdir -p /usr/share/containers/systemd \
+    && mkdir -p /usr/lib/systemd/system \
+    && mkdir -p /opt/project
 
-# Copy the host startup test and its systemd unit into the image. # host test install
-COPY bootc_host_test.sh /opt/project/bootc_host_test.sh # host test script
-COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service # host test systemd unit
+# Copy the host startup test and its systemd unit into the image.
+COPY bootc_host_test.sh /opt/project/bootc_host_test.sh
+COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service
 
-# Make the host startup test executable. # host script permissions
-RUN chmod 0755 /opt/project/bootc_host_test.sh # executable host test
+# Make the host startup test executable.
+RUN chmod 0755 /opt/project/bootc_host_test.sh
 
-# Copy the Quadlet files that define the pod-managed containers. # Quadlet install
-COPY devpod.kube /usr/share/containers/systemd/devpod.kube # Quadlet kube file
-COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml # pod manifest
+# Copy the Quadlet files that define the pod-managed containers.
+COPY devpod.kube /usr/share/containers/systemd/devpod.kube
+COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
-# Enable the host-native services that should start on boot. # host boot services
-RUN systemctl enable sshd \ # enable host sshd
-    && systemctl enable bootc-host-test.service \ # enable host startup test
-    && systemctl enable nvidia-cdi-refresh.path \ # enable NVIDIA CDI refresh path unit
-    && systemctl enable nvidia-cdi-refresh.service # enable NVIDIA CDI refresh service
+# Enable the host-native services that should start on boot.
+RUN systemctl enable sshd \
+    && systemctl enable bootc-host-test.service \
+    && systemctl enable nvidia-cdi-refresh.path \
+    && systemctl enable nvidia-cdi-refresh.service
 ```
 
 ---
@@ -62,23 +62,23 @@ RUN systemctl enable sshd \ # enable host sshd
 ## `bootc-host-test.service`
 
 ```ini
-# Run the host startup test automatically at boot. # host test unit
-[Unit] # begin unit section
-Description=Run bootc host startup test # host test description
-After=network-online.target sshd.service nvidia-cdi-refresh.service # wait for network, sshd, and CDI refresh
-Wants=network-online.target # prefer network online first
+# Run the host startup test automatically at boot.
+[Unit]
+Description=Run bootc host startup test
+After=network-online.target sshd.service nvidia-cdi-refresh.service
+Wants=network-online.target
 
-# Define how the host test runs. # service execution
-[Service] # begin service section
-Type=oneshot # run once and exit
-ExecStart=/opt/project/bootc_host_test.sh # host test script path
-RemainAfterExit=yes # keep successful state visible
-StandardOutput=journal # log stdout to journal
-StandardError=journal # log stderr to journal
+# Define how the host test runs.
+[Service]
+Type=oneshot
+ExecStart=/opt/project/bootc_host_test.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
 
-# Start this service during normal boot. # boot activation
-[Install] # begin install section
-WantedBy=multi-user.target # standard boot target
+# Start this service during normal boot.
+[Install]
+WantedBy=multi-user.target
 ```
 
 ---
@@ -86,7 +86,7 @@ WantedBy=multi-user.target # standard boot target
 ## `bootc_host_test.sh`
 
 ```bash
-#!/usr/bin/env bash # run with bash
+#!/usr/bin/env bash
 
 # Exit on errors, unset vars, and failed pipelines. # strict bash mode
 set -euo pipefail # strict execution
@@ -123,20 +123,20 @@ echo "=== bootc_host_test.sh completed ===" # completion marker
 ## `devpod.kube`
 
 ```ini
-# Define the Quadlet-managed pod that contains the dev and backup containers. # Quadlet kube file
-[Unit] # begin unit section
-Description=Dev pod with dev container and backup sidecar # pod description
-After=network-online.target sshd.service nvidia-cdi-refresh.service # wait for host sshd and CDI refresh
-Wants=network-online.target # prefer network online
-Requires=nvidia-cdi-refresh.service # require CDI refresh before GPU pod start
+# Define the Quadlet-managed pod that contains the dev and backup containers.
+[Unit]
+Description=Dev pod with dev container and backup sidecar
+After=network-online.target sshd.service nvidia-cdi-refresh.service
+Wants=network-online.target
+Requires=nvidia-cdi-refresh.service
 
-# Point Quadlet at the pod manifest. # kube manifest reference
-[Kube] # begin kube section
-Yaml=/usr/share/containers/systemd/devpod.yaml # pod manifest path
+# Point Quadlet at the pod manifest.
+[Kube]
+Yaml=/usr/share/containers/systemd/devpod.yaml
 
-# Make the generated pod service part of normal boot. # auto-start pod at boot
-[Install] # begin install section
-WantedBy=multi-user.target # standard boot target
+# Make the generated pod service part of normal boot.
+[Install]
+WantedBy=multi-user.target
 ```
 
 ---
@@ -178,28 +178,28 @@ spec: # begin spec
 ## `dev-container.Containerfile`
 
 ```dockerfile
-# Use NVIDIA's PyTorch image as the dev container base. # dev container base
-FROM nvcr.io/nvidia/pytorch:26.03-py3 # GPU-capable PyTorch base image
+# Use NVIDIA's PyTorch image as the dev container base.
+FROM nvcr.io/nvidia/pytorch:26.03-py3
 
-# Install only the minimum extra packages we need. # dev package install
-RUN apt-get update \ # refresh apt metadata
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y \ # install packages without prompts
-       bash \ # provide shell for interactive use
-       procps \ # provide ps and related tools
-    && rm -rf /var/lib/apt/lists/* # clean apt metadata
+# Install only the minimum extra packages we need.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+       bash \
+       procps \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create the working directory used by the dev container. # dev filesystem setup
-RUN mkdir -p /workspace # workspace directory
+# Create the working directory used by the dev container.
+RUN mkdir -p /workspace
 
-# Copy the dev startup wrapper and startup test into the image. # dev runtime files
-COPY dev_container_start.sh /usr/local/bin/dev_container_start.sh # startup wrapper
-COPY dev_container_test.py /workspace/dev_container_test.py # startup test script
+# Copy the dev startup wrapper and startup test into the image.
+COPY dev_container_start.sh /usr/local/bin/dev_container_start.sh
+COPY dev_container_test.py /workspace/dev_container_test.py
 
-# Make the startup wrapper executable. # dev script permissions
-RUN chmod 0755 /usr/local/bin/dev_container_start.sh # executable startup wrapper
+# Make the startup wrapper executable.
+RUN chmod 0755 /usr/local/bin/dev_container_start.sh
 
-# Start the wrapper when the container starts. # dev startup command
-CMD ["/usr/local/bin/dev_container_start.sh"] # container runtime command
+# Start the wrapper when the container starts.
+CMD ["/usr/local/bin/dev_container_start.sh"]
 ```
 
 ---
@@ -207,7 +207,7 @@ CMD ["/usr/local/bin/dev_container_start.sh"] # container runtime command
 ## `dev_container_start.sh`
 
 ```bash
-#!/usr/bin/env bash # run with bash
+#!/usr/bin/env bash
 
 # Exit on errors, unset vars, and failed pipelines. # strict bash mode
 set -euo pipefail # strict execution
@@ -230,7 +230,7 @@ tail -f /dev/null # keep container running
 ## `dev_container_test.py`
 
 ```python
-#!/usr/bin/env python3 # run with python3
+#!/usr/bin/env python3
 
 # Import required modules for the startup smoke test. # import modules
 import sys # provide stderr and exits
@@ -268,26 +268,26 @@ print("=== dev_container_test.py completed ===", flush=True) # completion marker
 ## `backup-container.Containerfile`
 
 ```dockerfile
-# Use a small Fedora base for the backup sidecar. # backup sidecar base
-FROM registry.fedoraproject.org/fedora:42 # Fedora userspace base image
+# Use a small Fedora base for the backup sidecar.
+FROM registry.fedoraproject.org/fedora:42
 
-# Install only the minimal tools needed for the placeholder sidecar. # backup package install
-RUN dnf -y install \ # begin package install
-    bash \ # provide shell
-    coreutils \ # provide standard tools
-    && dnf clean all # clean package metadata
+# Install only the minimal tools needed for the placeholder sidecar.
+RUN dnf -y install \
+    bash \
+    coreutils \
+    && dnf clean all
 
-# Create a workspace directory for future backup logic. # backup filesystem setup
-RUN mkdir -p /workspace # workspace directory
+# Create a workspace directory for future backup logic.
+RUN mkdir -p /workspace
 
-# Copy the placeholder backup script into the image. # backup runtime file
-COPY backup_stub.sh /usr/local/bin/backup_stub.sh # backup stub path
+# Copy the placeholder backup script into the image.
+COPY backup_stub.sh /usr/local/bin/backup_stub.sh
 
-# Make the backup script executable. # backup script permissions
-RUN chmod 0755 /usr/local/bin/backup_stub.sh # executable backup stub
+# Make the backup script executable.
+RUN chmod 0755 /usr/local/bin/backup_stub.sh
 
-# Start the placeholder backup script when the container starts. # backup startup command
-CMD ["/usr/local/bin/backup_stub.sh"] # backup container runtime command
+# Start the placeholder backup script when the container starts.
+CMD ["/usr/local/bin/backup_stub.sh"]
 ```
 
 ---
@@ -295,7 +295,7 @@ CMD ["/usr/local/bin/backup_stub.sh"] # backup container runtime command
 ## `backup_stub.sh`
 
 ```bash
-#!/usr/bin/env bash # run with bash
+#!/usr/bin/env bash
 
 # Exit on errors, unset vars, and failed pipelines. # strict bash mode
 set -euo pipefail # strict execution
@@ -431,4 +431,3 @@ That keeps all SSH configuration and SSH exposure on the **host**, which is exac
   * nothing yet beyond validating the pod pattern
 
 Avoids rewriting SSH setup for every future container you build.
-

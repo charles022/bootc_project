@@ -1,22 +1,22 @@
-# Use NVIDIA's PyTorch image as the dev container base. # dev container base
-FROM nvcr.io/nvidia/pytorch:26.03-py3 # GPU-capable PyTorch base image
+# Use NVIDIA's PyTorch image as the dev container base.
+FROM nvcr.io/nvidia/pytorch:26.03-py3
 
-# Install only the minimum extra packages we need. # dev package install
-RUN apt-get update \ # refresh apt metadata
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y \ # install packages without prompts
-       bash \ # provide shell for interactive use
-       procps \ # provide ps and related tools
-    && rm -rf /var/lib/apt/lists/* # clean apt metadata
+# Install only the minimum extra packages we need.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+       bash \
+       procps \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create the working directory used by the dev container. # dev filesystem setup
-RUN mkdir -p /workspace # workspace directory
+# Create the working directory used by the dev container.
+RUN mkdir -p /workspace
 
-# Copy the dev startup wrapper and startup test into the image. # dev runtime files
-COPY dev_container_start.sh /usr/local/bin/dev_container_start.sh # startup wrapper
-COPY dev_container_test.py /workspace/dev_container_test.py # startup test script
+# Copy the dev startup wrapper and startup test into the image.
+COPY dev_container_start.sh /usr/local/bin/dev_container_start.sh
+COPY dev_container_test.py /workspace/dev_container_test.py
 
-# Make the startup wrapper executable. # dev script permissions
-RUN chmod 0755 /usr/local/bin/dev_container_start.sh # executable startup wrapper
+# Make the startup wrapper executable.
+RUN chmod 0755 /usr/local/bin/dev_container_start.sh
 
-# Start the wrapper when the container starts. # dev startup command
-CMD ["/usr/local/bin/dev_container_start.sh"] # container runtime command
+# Start the wrapper when the container starts.
+CMD ["/usr/local/bin/dev_container_start.sh"]
