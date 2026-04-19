@@ -1,0 +1,17 @@
+# Run the host startup test automatically at boot. # host test unit
+[Unit] # begin unit section
+Description=Run bootc host startup test # host test description
+After=network-online.target sshd.service nvidia-cdi-refresh.service # wait for network, sshd, and CDI refresh
+Wants=network-online.target # prefer network online first
+
+# Define how the host test runs. # service execution
+[Service] # begin service section
+Type=oneshot # run once and exit
+ExecStart=/opt/project/bootc_host_test.sh # host test script path
+RemainAfterExit=yes # keep successful state visible
+StandardOutput=journal # log stdout to journal
+StandardError=journal # log stderr to journal
+
+# Start this service during normal boot. # boot activation
+[Install] # begin install section
+WantedBy=multi-user.target # standard boot target

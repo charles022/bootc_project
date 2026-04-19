@@ -1,0 +1,33 @@
+# Use Fedora bootc as the host operating system image. # host image base
+FROM quay.io/fedora/fedora-bootc:42 # bootc base image
+
+# Install only the host packages we actually need. # host package install
+RUN dnf -y install \ # begin package install
+    openssh-server \ # provide host sshd
+    podman \ # provide podman and quadlet support
+    nvidia-container-toolkit-base \ # provide NVIDIA CDI refresh support
+    bash \ # provide shell for host scripts
+    coreutils \ # provide standard utilities
+    && dnf clean all # clean package metadata
+
+# Create only the directories we need in the host image. # host directory setup
+RUN mkdir -p /usr/share/containers/systemd \ # Quadlet system path
+    && mkdir -p /usr/lib/systemd/system \ # systemd unit path
+    && mkdir -p /opt/project # host project path
+
+# Copy the host startup test and its systemd unit into the image. # host test install
+COPY bootc_host_test.sh /opt/project/bootc_host_test.sh # host test script
+COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service # host test systemd unit
+
+# Make the host startup test executable. # host script permissions
+RUN chmod 0755 /opt/project/bootc_host_test.sh # executable host test
+
+# Copy the Quadlet files that define the pod-managed containers. # Quadlet install
+COPY devpod.kube /usr/share/containers/systemd/devpod.kube # Quadlet kube file
+COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml # pod manifest
+
+# Enable the host-native services that should start on boot. # host boot services
+RUN systemctl enable sshd \ # enable host sshd
+    && systemctl enable bootc-host-test.service \ # enable host startup test
+    && systemctl enable nvidia-cdi-refresh.path \ # enable NVIDIA CDI refresh path unit
+    && systemctl enable nvidia-cdi-refresh.service # enable NVIDIA CDI refresh service

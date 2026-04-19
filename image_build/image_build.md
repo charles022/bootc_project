@@ -1,16 +1,3 @@
-Absolutely. Here is the **rewritten minimal project layout and file contents** with these updates applied:
-
-* **host SSH only**
-* **no SSH inside the dev container**
-* **enter the dev container via `podman exec` from the host**
-* **keep SSH configuration centralized on the bootc host**
-* **keep the overall file count and configuration surface small**
-* **keep NVIDIA CDI on the NVIDIA-provided runtime-refresh model**
-* **keep the pod with both the dev container and backup sidecar**
-
-This is much closer to your original “less is more” shape while still preserving the right ownership boundaries.
-
----
 
 # Project layout
 
@@ -325,26 +312,89 @@ tail -f /dev/null # keep sidecar running
 
 ---
 
-# What changed from the previous version
+## `build_images.sh`
 
-## Removed
+```bash
+#!/usr/bin/env bash
 
-* all **dev container SSH**
-* all **dev container SSH config**
-* all **authorized_keys files**
-* extra SSH layering and per-container SSH management
-* extra NVIDIA config override file that was not necessary yet
+# Exit on errors, unset vars, and failed pipelines.
+set -euo pipefail
 
-## Kept
+# Navigate to the script directory to ensure relative paths work.
+cd "$(dirname "$0")"
 
-* **host SSH only**
-* **host startup test via systemd**
-* **NVIDIA built-in CDI refresh model**
-* **Quadlet-managed pod**
-* **dev container startup test**
-* **backup sidecar in the same pod**
+echo "=== Starting Build Process ==="
 
-## Simplified access model
+# 1. Build the dev container image
+echo "Building dev-container..."
+podman build -t ghcr.io/YOURORG/dev-container:latest -f dev-container.Containerfile .
+
+# 2. Build the backup sidecar image
+echo "Building backup-container..."
+podman build -t ghcr.io/YOURORG/backup-container:latest -f backup-container.Containerfile .
+
+# 3. Build the bootc host image
+echo "Building bootc host image..."
+# Note: The host image tag is local as it is the final bootable output.
+podman build -t gpu-bootc-host:latest -f Containerfile .
+
+echo "=== Build Complete ==="
+echo "Images created:"
+echo "  - ghcr.io/YOURORG/dev-container:latest"
+echo "  - ghcr.io/YOURORG/backup-container:latest"
+echo "  - gpu-bootc-host:latest"
+```
+
+---
+
+## `run_bootc_vm.sh`
+
+```bash
+#!/usr/bin/env bash
+
+# Exit on errors, unset vars, and failed pipelines.
+set -euo pipefail
+
+# The container image to convert and run (e.g., gpu-bootc-host:latest)
+IMAGE_NAME="${1:-gpu-bootc-host:latest}"
+
+echo "=== Converting $IMAGE_NAME to qcow2 ==="
+
+# Ensure a fresh output directory
+mkdir -p ./output
+sudo rm -rf ./output/*
+
+# 1. Convert the Bootable Container to a Disk Image
+sudo podman run \
+  --rm \
+  --privileged \
+  -v ./output:/output \
+  -v /var/lib/containers/storage:/var/lib/containers/storage \
+  quay.io/centos-bootc/bootc-image-builder:latest \
+  --type qcow2 \
+  --local "localhost/$IMAGE_NAME"
+
+echo "=== Starting VM with virt-install ==="
+
+# 2. Boot the VM with virt-install
+sudo virt-install \
+  --name gpu-bootc-test \
+  --memory 16384 \
+  --vcpus 8 \
+  --disk path=./output/qcow2/disk.qcow2,format=qcow2,bus=virtio \
+  --import \
+  --os-variant fedora-unknown \
+  --network network=default \
+  --graphics none \
+  --console pty,target_type=serial \
+  --boot uefi
+```
+
+---
+
+# version
+
+## Access model
 
 The intended operator flow is now:
 
@@ -361,9 +411,7 @@ sudo podman exec -it <dev-container-name> /bin/bash # open shell in dev containe
 
 That keeps all SSH configuration and SSH exposure on the **host**, which is exactly the simplification you wanted.
 
-# Why this is the better fit
-
-This version keeps the ownership model clean:
+# Ownership model
 
 * **host** owns:
 
@@ -382,7 +430,5 @@ This version keeps the ownership model clean:
 
   * nothing yet beyond validating the pod pattern
 
-And it avoids rewriting SSH setup for every future container you build.
-
-If you want, the next step should be to simplify this one more notch by deciding whether `bootc_host_test.sh` should also verify that the dev container test completed successfully through `podman logs`, so the host test becomes a single top-level validation point.
+Avoids rewriting SSH setup for every future container you build.
 

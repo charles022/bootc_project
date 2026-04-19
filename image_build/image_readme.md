@@ -1,3 +1,10 @@
+## Build the entire project and launch the VM with these two commands:
+
+   1 cd gpu-bootc/
+   2 ./build_images.sh
+   3 ./run_bootc_vm.sh
+
+
 ## GPU Bootc Dev Environment — Overview
 
 This project builds a **Fedora bootc host image** that automatically starts a **GPU-capable development pod**. The system is designed to be minimal, deterministic, and easy to reason about.
@@ -66,6 +73,23 @@ Pod contains:
 
 * Minimal container for validating multi-container pod structure
 * No real functionality yet
+
+---
+
+## Build and Execution
+
+### 1) Build Images
+Use the provided script to build all containers in the correct order:
+```bash
+./build_images.sh
+```
+
+### 2) Run as VM
+Convert the bootc host image to a disk image and boot it as a VM:
+```bash
+./run_bootc_vm.sh gpu-bootc-host:latest
+```
+This script handles the `bootc-image-builder` conversion to `.qcow2` and invokes `virt-install` with the required UEFI and resource parameters.
 
 ---
 
