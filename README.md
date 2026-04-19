@@ -46,6 +46,7 @@ Checklist/Plan:
 ---
 # base
     1. build bootc image (no enhancements)
+        ./01_build_image/
     2. run bootc image as container
     3. choose vm software
     4. build bootc image as iso
