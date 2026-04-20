@@ -11,7 +11,7 @@ spec: # begin spec
   containers: # begin container list
     # Main dev container that owns the development environment and startup test. # dev container entry
     - name: dev-container # dev container name
-      image: ghcr.io/YOURORG/dev-container:latest # dev container image reference
+      image: quay.io/m0ranmcharles/fedora_init:dev-container # dev container image reference
       stdin: true # allow interactive stdin
       tty: true # allocate tty for podman exec sessions
       workingDir: /workspace # default working directory
@@ -21,7 +21,7 @@ spec: # begin spec
 
     # Placeholder backup sidecar used only to validate pod wiring. # backup sidecar entry
     - name: backup-container # backup container name
-      image: ghcr.io/YOURORG/backup-container:latest # backup sidecar image reference
+      image: quay.io/m0ranmcharles/fedora_init:backup-container # backup sidecar image reference
       stdin: true # allow interactive stdin if needed
       tty: true # allocate tty for inspection
       workingDir: /workspace # default working directory

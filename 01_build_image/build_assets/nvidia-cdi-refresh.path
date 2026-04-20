@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for NVIDIA devices to refresh CDI
+
+[Path]
+PathExists=/dev/nvidiactl
+Unit=nvidia-cdi-refresh.service
+
+[Install]
+WantedBy=multi-user.target

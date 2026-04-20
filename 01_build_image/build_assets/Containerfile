@@ -2,12 +2,14 @@
 FROM quay.io/fedora/fedora-bootc:42
 
 # Install only the host packages we actually need.
-RUN dnf -y install \
-    openssh-server \
-    podman \
-    nvidia-container-toolkit-base \
-    bash \
-    coreutils \
+RUN dnf -y install 'dnf5-command(config-manager)' \
+    && dnf config-manager addrepo --from-repofile=https://developer.download.nvidia.com/compute/cuda/repos/fedora42/x86_64/cuda-fedora42.repo \
+    && dnf -y install \
+       openssh-server \
+       podman \
+       nvidia-container-toolkit \
+       bash \
+       coreutils \
     && dnf clean all
 
 # Create only the directories we need in the host image.
@@ -18,6 +20,8 @@ RUN mkdir -p /usr/share/containers/systemd \
 # Copy the host startup test and its systemd unit into the image.
 COPY bootc_host_test.sh /opt/project/bootc_host_test.sh
 COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service
+COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
+COPY nvidia-cdi-refresh.path /usr/lib/systemd/system/nvidia-cdi-refresh.path
 
 # Make the host startup test executable.
 RUN chmod 0755 /opt/project/bootc_host_test.sh

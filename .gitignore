@@ -1,0 +1,23 @@
+# Build Outputs
+output/
+*.qcow2
+*.raw
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# System / IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Project-specific temporary files
+*.tmp
+estimate_push_time.py
