@@ -1,8 +1,8 @@
 # Run the host startup test automatically at boot.
 [Unit]
 Description=Run bootc host startup test
-After=network-online.target sshd.service nvidia-cdi-refresh.service
-Wants=network-online.target
+After=network-online.target sshd.service nvidia-cdi-refresh.service devpod.service
+Wants=network-online.target devpod.service
 
 # Define how the host test runs.
 [Service]

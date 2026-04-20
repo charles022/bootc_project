@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 
-# Exit on errors, unset vars, and failed pipelines. # strict bash mode
-set -euo pipefail # strict execution
+set -euo pipefail
 
-# Emit a clear start marker for container logs. # dev startup banner
-echo "=== dev_container_start.sh starting ===" # start marker
+echo "=== dev_container_start.sh starting ==="
 
-# Run the dev container startup test. # execute startup test
-python3 /workspace/dev_container_test.py # run dev startup test
+python3 /usr/local/share/dev-container/dev_container_test.py
 
-# Emit a message indicating the container will remain alive. # keepalive message
-echo "=== dev container startup complete; staying alive ===" # keepalive marker
+if [[ "${DEV_ONCE:-0}" == "1" ]]; then
+  exit 0
+fi
 
-# Keep the container alive so we can enter it later with podman exec. # persistent foreground loop
-tail -f /dev/null # keep container running
+echo "=== dev container startup complete; staying alive ==="
+tail -f /dev/null

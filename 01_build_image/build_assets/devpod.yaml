@@ -1,27 +1,38 @@
-# Define a pod containing the dev container and backup sidecar. # pod manifest header
-apiVersion: v1 # Kubernetes API version
-kind: Pod # define a pod
-metadata: # begin metadata block
-  name: devpod # pod name
+apiVersion: v1
+kind: Pod
+metadata:
+  name: devpod
 
-# Define pod behavior and its child containers. # pod spec block
-spec: # begin spec
-  restartPolicy: Always # keep pod containers running
+spec:
+  restartPolicy: Always
 
-  containers: # begin container list
-    # Main dev container that owns the development environment and startup test. # dev container entry
-    - name: dev-container # dev container name
-      image: ghcr.io/YOURORG/dev-container:latest # dev container image reference
-      stdin: true # allow interactive stdin
-      tty: true # allocate tty for podman exec sessions
-      workingDir: /workspace # default working directory
-      resources: # begin resource limits
-        limits: # resource limit block
-          nvidia.com/gpu=all: 1 # request GPU access through CDI
+  containers:
+    - name: dev-container
+      image: localhost/bootc-dev/dev-container:latest
+      stdin: true
+      tty: true
+      workingDir: /workspace
+      env:
+        - name: REQUIRE_CUDA
+          value: "1"
+      resources:
+        limits:
+          nvidia.com/gpu=all: 1
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
 
-    # Placeholder backup sidecar used only to validate pod wiring. # backup sidecar entry
-    - name: backup-container # backup container name
-      image: ghcr.io/YOURORG/backup-container:latest # backup sidecar image reference
-      stdin: true # allow interactive stdin if needed
-      tty: true # allocate tty for inspection
-      workingDir: /workspace # default working directory
+    - name: backup-container
+      image: localhost/bootc-dev/backup-container:latest
+      stdin: true
+      tty: true
+      workingDir: /workspace
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+
+  volumes:
+    - name: workspace
+      hostPath:
+        path: /var/lib/devpod/workspace
+        type: DirectoryOrCreate

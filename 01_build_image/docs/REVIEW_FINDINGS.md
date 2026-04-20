@@ -1,33 +1,12 @@
 # Review Findings
 
-These findings remain after fixing parser-breaking comment placement.
+Current status after the build asset cleanup:
 
-## Pod Images Are Placeholder Registry References
+- Image names are now controlled by `build_image.sh` and passed into the bootc image build.
+- The default pod image names are local development names, not placeholder registry names.
+- The dev and backup containers share `/var/lib/devpod/workspace` through the pod manifest.
+- Startup tests now fail when required host, pod, or GPU checks fail.
+- The host image creates `devuser`; host builds fail unless `SSH_AUTHORIZED_KEY` or a default public key is available, except when `ALLOW_NO_SSH_KEY=1` is explicitly set.
+- `nvidia.com/gpu=all: 1` is documented by Podman 5.8.1 `podman-kube-play(1)` for CDI device selection. Recheck this on the final target Podman version.
 
-`build_images.sh` builds the dev and backup images as:
-
-```text
-ghcr.io/YOURORG/dev-container:latest
-ghcr.io/YOURORG/backup-container:latest
-```
-
-`devpod.yaml` uses those same image names. A booted VM will need to pull those
-images from GHCR unless they are preloaded into the VM's container storage. The
-`YOURORG` placeholder should be replaced with a real registry namespace and the
-images should be pushed, or the bootc host image should be changed to include or
-otherwise preload the container images it starts at boot.
-
-## GPU Resource Declaration Needs Validation
-
-`devpod.yaml` currently declares:
-
-```yaml
-resources:
-  limits:
-    nvidia.com/gpu=all: 1
-```
-
-That key is not standard Kubernetes extended-resource syntax. Before relying on
-Quadlet/Podman to start the GPU pod, validate the supported CDI/GPU request form
-for the target Podman and NVIDIA Container Toolkit versions, then update the pod
-manifest accordingly.
+See `BUILD_TEST_REFERENCE.md` for the active build and validation path.

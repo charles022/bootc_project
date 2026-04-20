@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# Exit on errors, unset vars, and failed pipelines. # strict bash mode
-set -euo pipefail # strict execution
+set -euo pipefail
 
-# Emit a clear start marker for the backup sidecar logs. # backup banner
-echo "=== backup_stub.sh starting ===" # start marker
+echo "=== backup_stub.sh starting ==="
 
-# Explain that this sidecar is only a placeholder for pod validation. # placeholder note
-echo "backup sidecar placeholder: no real backup logic implemented yet" # placeholder message
+echo "backup sidecar placeholder: no real backup logic implemented yet"
 
-# Keep the sidecar alive so the pod can be inspected. # persistent foreground loop
-tail -f /dev/null # keep sidecar running
+if [[ "${BACKUP_ONCE:-0}" == "1" ]]; then
+  exit 0
+fi
+
+tail -f /dev/null

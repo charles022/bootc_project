@@ -1,33 +1,58 @@
 # Use Fedora bootc as the host operating system image.
 FROM quay.io/fedora/fedora-bootc:42
 
-# Install only the host packages we actually need.
+# These are copied into devpod.yaml at build time so local and registry tests use
+# the same host image definition.
+ARG DEV_IMAGE=localhost/bootc-dev/dev-container:latest
+ARG BACKUP_IMAGE=localhost/bootc-dev/backup-container:latest
+ARG SSH_AUTHORIZED_KEY=
+
 RUN dnf -y install \
-    openssh-server \
-    podman \
-    nvidia-container-toolkit-base \
-    bash \
-    coreutils \
-    && dnf clean all
+	    curl \
+	    openssh-server \
+	    podman \
+	    shadow-utils \
+	    sudo \
+	    bash \
+	    coreutils \
+	    https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+	    https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm \
+	    && curl -sL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo -o /etc/yum.repos.d/nvidia-container-toolkit.repo \
+	    && dnf -y install \
+	    akmod-nvidia \
+	    xorg-x11-drv-nvidia-cuda \
+	    nvidia-container-toolkit \
+	    && dnf clean all
 
-# Create only the directories we need in the host image.
 RUN mkdir -p /usr/share/containers/systemd \
-    && mkdir -p /usr/lib/systemd/system \
-    && mkdir -p /opt/project
+	    && mkdir -p /usr/lib/systemd/system \
+	    && mkdir -p /opt/project \
+	    && mkdir -p /var/lib/devpod/workspace
 
-# Copy the host startup test and its systemd unit into the image.
 COPY bootc_host_test.sh /opt/project/bootc_host_test.sh
 COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service
 
-# Make the host startup test executable.
 RUN chmod 0755 /opt/project/bootc_host_test.sh
 
-# Copy the Quadlet files that define the pod-managed containers.
 COPY devpod.kube /usr/share/containers/systemd/devpod.kube
 COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
+RUN sed -i \
+	    -e "s|localhost/bootc-dev/dev-container:latest|${DEV_IMAGE}|g" \
+	    -e "s|localhost/bootc-dev/backup-container:latest|${BACKUP_IMAGE}|g" \
+	    /usr/share/containers/systemd/devpod.yaml
 
-# Enable the host-native services that should start on boot.
+RUN useradd -m -G wheel devuser \
+	    && passwd -l devuser \
+	    && install -d -m 0700 -o devuser -g devuser /home/devuser/.ssh \
+	    && if [ -n "$SSH_AUTHORIZED_KEY" ]; then \
+	      printf '%s\n' "$SSH_AUTHORIZED_KEY" > /home/devuser/.ssh/authorized_keys; \
+	      chown devuser:devuser /home/devuser/.ssh/authorized_keys; \
+	      chmod 0600 /home/devuser/.ssh/authorized_keys; \
+	    fi \
+	    && printf '%%wheel ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/wheel-nopasswd \
+	    && chmod 0440 /etc/sudoers.d/wheel-nopasswd
+
 RUN systemctl enable sshd \
-    && systemctl enable bootc-host-test.service \
-    && systemctl enable nvidia-cdi-refresh.path \
-    && systemctl enable nvidia-cdi-refresh.service
+	    && systemctl enable bootc-host-test.service \
+	    && systemctl enable nvidia-cdi-refresh.path \
+	    && systemctl enable nvidia-cdi-refresh.service

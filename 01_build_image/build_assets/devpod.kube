@@ -8,6 +8,7 @@ Requires=nvidia-cdi-refresh.service
 # Point Quadlet at the pod manifest.
 [Kube]
 Yaml=/usr/share/containers/systemd/devpod.yaml
+AutoUpdate=registry
 
 # Make the generated pod service part of normal boot.
 [Install]

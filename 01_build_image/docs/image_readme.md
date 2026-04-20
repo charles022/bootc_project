@@ -1,8 +1,13 @@
-## Build the entire project and launch the VM with these two commands:
+## Build and test path
 
-   1 cd gpu-bootc/
-   2 ./build_images.sh
-   3 ./run_bootc_vm.sh
+```bash
+./build_image.sh containers
+./build_image.sh test-containers
+./build_image.sh all
+./02_build_vm/run_bootc_vm.sh localhost/gpu-bootc-host:latest
+```
+
+See `BUILD_TEST_REFERENCE.md` for registry testing and environment variables.
 
 
 ## GPU Bootc Dev Environment — Overview
@@ -43,7 +48,7 @@ At boot:
 
   * SSH availability
   * CDI presence (`/var/run/cdi/nvidia.yaml`)
-  * Optional `nvidia-smi`
+  * `nvidia-smi`
   * Pod service visibility
 
 ### 3) Quadlet + Pod
@@ -61,7 +66,7 @@ Pod contains:
 * Built from `dev-container.Containerfile`
 * On startup:
 
-  * runs `dev_container_test.py`
+  * runs `/usr/local/share/dev-container/dev_container_test.py`
   * stays alive (`tail -f /dev/null`)
 * Entered via:
 
@@ -81,13 +86,13 @@ Pod contains:
 ### 1) Build Images
 Use the provided script to build all containers in the correct order:
 ```bash
-./build_images.sh
+./build_image.sh all
 ```
 
 ### 2) Run as VM
 Convert the bootc host image to a disk image and boot it as a VM:
 ```bash
-./run_bootc_vm.sh gpu-bootc-host:latest
+./02_build_vm/run_bootc_vm.sh localhost/gpu-bootc-host:latest
 ```
 This script handles the `bootc-image-builder` conversion to `.qcow2` and invokes `virt-install` with the required UEFI and resource parameters.
 
@@ -169,7 +174,7 @@ This script handles the `bootc-image-builder` conversion to `.qcow2` and invokes
 
 ```bash
 # SSH into the host
-ssh user@host
+ssh devuser@host
 
 # View running containers
 sudo podman ps
@@ -194,4 +199,3 @@ The result is:
 * reproducible
 * aligned with Fedora bootc + Podman design
 * easy to extend without refactoring core structure
-
