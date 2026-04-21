@@ -15,8 +15,13 @@ Build all three images (dev-container, backup-container, bootc host):
 ./build_image.sh
 ```
 - Tags the host image as both `gpu-bootc-host:latest` (local) and `quay.io/m0ranmcharles/fedora_init:latest` (remote).
-- **No SSH keys or credentials** are baked in — the OCI image is deliberately keyless so it's safe to push publicly. Credentials are injected at deployment (qcow2/ISO) time; see `run_bootc_vm.sh` and the README "Access" section.
+- **No SSH keys or credentials** are baked in — the OCI image is deliberately keyless so it's safe to push publicly. Credentials are injected at deployment (qcow2/ISO) time; see `02_build_vm/build_vm.sh` and the README "Access" section.
 - Build context for all three is `01_build_image/build_assets/` — any new `COPY` source must live there.
+
+Run the host image as an ephemeral root shell (local exploration — no systemd, no SSH, no services):
+```bash
+./run_container.sh [IMAGE_NAME]   # defaults to gpu-bootc-host:latest
+```
 
 Push all three images to Quay:
 ```bash
@@ -24,15 +29,21 @@ Push all three images to Quay:
 ```
 - Uses `--format v2s2` deliberately. Requires a prior `podman login quay.io` (see `quay_repository.md` for the encrypted-CLI-password flow).
 
-Run the host image as a local VM:
+Build the VM disk image (qcow2) from the host OCI image:
 ```bash
-./02_build_vm/run_bootc_vm.sh [IMAGE_NAME]   # defaults to gpu-bootc-host:latest
+./02_build_vm/build_vm.sh [IMAGE_NAME]   # defaults to gpu-bootc-host:latest
 ```
-- Tears down any existing `gpu-bootc-test` VM at the start — no manual `virsh destroy/undefine` needed.
+- Auto-detects `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`; override with `SSH_PUB_KEY_FILE=`.
 - Pipes the image into root's container storage (`podman save | sudo podman load`) before calling `bootc-image-builder`, because `sudo podman` uses a separate storage path from the rootless build.
 - Generates `./output/config.toml` with a `[[customizations.user]]` entry injecting the SSH key, passes `--rootfs xfs --config /config.toml` to bootc-image-builder.
-- Copies the produced qcow2 to `/var/lib/libvirt/images/` (the libvirt storage pool) so QEMU's system user can read it.
-- Starts the VM with `--noautoconsole` so the script continues immediately rather than blocking on the serial console. Attach manually any time with `sudo virsh console gpu-bootc-test` (detach with Ctrl+]).
+- Copies the produced qcow2 to `/var/lib/libvirt/images/${VM_NAME}.qcow2` (the libvirt storage pool) so QEMU's system user can read it.
+
+Boot the VM and set up the `ssh fedora-init` alias:
+```bash
+./02_build_vm/run_vm.sh
+```
+- Tears down any existing `gpu-bootc-test` VM first — no manual `virsh destroy/undefine` needed.
+- Starts the VM with `--noautoconsole` so the script continues immediately. Attach manually with `sudo virsh console gpu-bootc-test` (detach with Ctrl+]).
 - After boot, polls `virsh domifaddr` for the VM IP, then writes/replaces a `Host fedora-init` block in `~/.ssh/config` with `StrictHostKeyChecking no` and `UserKnownHostsFile /dev/null` (so rebuilds don't trigger "host key changed" errors). Prints `ssh fedora-init` when done.
 - Overrides: `VM_NAME=...` for a different VM name; `SSH_PUB_KEY_FILE=/path/to/key.pub` for a non-default key.
 
@@ -54,7 +65,7 @@ Three layers, built independently, integrated via Quadlet:
    - Bakes in Quadlets at `/usr/share/containers/systemd/`: `devpod.kube` + `devpod.yaml`.
    - Enables `sshd`, `cloud-init.target` (for downstream NoCloud-seed key injection), and the bootc-specific units above.
    - Console autologin for root on tty1 (`autologin.conf`) is the recovery fallback — no per-user identity is baked in.
-   - Three access paths are supported: `podman run --entrypoint bash` for local exploration; `run_bootc_vm.sh` for a VM with SSH key injected at qcow2 build time; cloud-init NoCloud seed for downstream users of a pre-built binary. See README "Access" section.
+   - Three access paths are supported: `./run_container.sh` for local exploration; `build_vm.sh` + `run_vm.sh` for a VM with SSH key injected at qcow2 build time; cloud-init NoCloud seed for downstream users of a pre-built binary. See README "Access" section.
 
 2. **Dev container** (`dev-container.Containerfile`)
    - Base: `nvcr.io/nvidia/pytorch:26.03-py3` (large — this dominates push time).
