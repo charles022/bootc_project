@@ -2,12 +2,15 @@
 FROM quay.io/fedora/fedora-bootc:42
 
 # Install only the host packages we actually need.
+# cloud-init is included so downstream users can inject their own SSH key
+# via a NoCloud seed at first boot, without rebuilding the OCI image.
 RUN dnf -y install 'dnf5-command(config-manager)' \
     && dnf config-manager addrepo --from-repofile=https://developer.download.nvidia.com/compute/cuda/repos/fedora42/x86_64/cuda-fedora42.repo \
     && dnf -y install \
        openssh-server \
        podman \
        nvidia-container-toolkit \
+       cloud-init \
        bash \
        coreutils \
     && dnf clean all
@@ -23,6 +26,13 @@ COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
 COPY nvidia-cdi-refresh.path /usr/lib/systemd/system/nvidia-cdi-refresh.path
 
+# Setup Console Autologin for easy VM console access (no network required).
+# This is the fallback path — useful for recovery when SSH isn't reachable.
+# It does not compromise published images because console access requires
+# physical/virtual console, not network.
+RUN mkdir -p /etc/systemd/system/getty@tty1.service.d/
+COPY autologin.conf /etc/systemd/system/getty@tty1.service.d/override.conf
+
 # Make the host startup test executable.
 RUN chmod 0755 /opt/project/bootc_host_test.sh
 
@@ -31,7 +41,10 @@ COPY devpod.kube /usr/share/containers/systemd/devpod.kube
 COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
 # Enable the host-native services that should start on boot.
+# cloud-init.target pulls in the four cloud-init stages so a NoCloud seed
+# (or bootc-image-builder-injected config) is consumed on first boot.
 RUN systemctl enable sshd \
+    && systemctl enable cloud-init.target \
     && systemctl enable bootc-host-test.service \
     && systemctl enable nvidia-cdi-refresh.path \
     && systemctl enable nvidia-cdi-refresh.service

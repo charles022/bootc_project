@@ -42,6 +42,65 @@ This is the whitepaper for our project. The document ostree_notes.md contains so
       these backups then push them to the cloud at longer intervals. 
 
 
+## Access
+
+The published OCI image is intentionally keyless: no SSH keys, no passwords, no per-user identity is baked in. Credentials are injected at deployment time, so the same image on Quay is safe to share publicly and still boots to a machine only the deployer can log in to.
+
+There are three supported access paths, one per scenario:
+
+### 1. Explore the image locally (no network, no SSH)
+Just drop into a shell. SSH inside a throwaway container is an anti-pattern — `podman run` ignores systemd entirely, so give it a shell directly:
+```bash
+podman run --rm -it --entrypoint /bin/bash quay.io/m0ranmcharles/fedora_init:latest
+```
+You're root, no password, no login system.
+
+### 2. Build and SSH into a VM from this machine
+`./02_build_vm/run_bootc_vm.sh` auto-detects your local SSH key (`~/.ssh/id_ed25519.pub`, then `~/.ssh/id_rsa.pub`), writes a one-shot `bootc-image-builder` config that injects it into the produced qcow2, and boots the VM:
+```bash
+./02_build_vm/run_bootc_vm.sh
+# then, from another terminal:
+sudo virsh domifaddr gpu-bootc-test     # find VM IP
+ssh root@<vm-ip>                        # logs in with your existing key
+```
+The console also autologs root on tty1 as a recovery fallback (virsh console / serial) — useful when SSH is unreachable, and safe because console access requires the virtual console, not the network.
+
+Override the key with `SSH_PUB_KEY_FILE=/path/to/key.pub ./02_build_vm/run_bootc_vm.sh` if you don't want the default lookup.
+
+### 3. Anyone else downloads the image and boots it (cloud-init)
+The image ships with `cloud-init` installed and enabled. A downstream user who has a pre-built qcow2/ISO doesn't need to rebuild anything — they create a NoCloud seed with their own SSH key and attach it at boot:
+```bash
+# user-data with their key
+cat > user-data <<EOF
+#cloud-config
+users:
+  - name: root
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA... their-key
+EOF
+echo "instance-id: iid-local01
+local-hostname: bootc-vm" > meta-data
+
+# build a NoCloud seed.iso
+cloud-localds seed.iso user-data meta-data
+
+# attach it to the VM (example with virt-install)
+virt-install ... --disk path=disk.qcow2 --disk path=seed.iso,device=cdrom
+```
+First boot, cloud-init picks up the seed and writes their key into root's `authorized_keys`. Subsequent reboots don't need the seed.
+
+For people who want to build their own qcow2 from the OCI image (instead of using a pre-built binary), the pattern is identical to scenario 2 — they run `run_bootc_vm.sh` after cloning this repo.
+
+### Summary
+
+| Scenario | Mechanism | Key source |
+|----------|-----------|------------|
+| Poke at the image | `podman run ... bash` | none needed |
+| Build + run VM locally | `bootc-image-builder --config` | your `~/.ssh/*.pub` (auto) |
+| Distribute pre-built binary | cloud-init NoCloud seed | recipient's own key |
+
+
+
 Checklist/Plan:
 ---
 # base
