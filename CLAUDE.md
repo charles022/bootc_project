@@ -47,11 +47,6 @@ Boot the VM and set up the `ssh fedora-init` alias:
 - After boot, polls `virsh domifaddr` for the VM IP, then writes/replaces a `Host fedora-init` block in `~/.ssh/config` with `StrictHostKeyChecking no` and `UserKnownHostsFile /dev/null` (so rebuilds don't trigger "host key changed" errors). Prints `ssh fedora-init` when done.
 - Overrides: `VM_NAME=...` for a different VM name; `SSH_PUB_KEY_FILE=/path/to/key.pub` for a non-default key.
 
-Estimate Quay push time for current local images:
-```bash
-./estimate_push_time.py
-```
-
 There are no tests, linters, or CI configured. Smoke validation happens at runtime: `bootc-host-test.service` runs `bootc_host_test.sh` at boot, and the dev container's CMD runs `dev_container_test.py` (imports torch, checks CUDA).
 
 ## Architecture
@@ -60,7 +55,7 @@ Three layers, built independently, integrated via Quadlet:
 
 1. **Bootc host image** (`01_build_image/build_assets/Containerfile`)
    - Base: `quay.io/fedora/fedora-bootc:42`
-   - Adds NVIDIA CUDA repo, installs `nvidia-container-toolkit`, `podman`, `openssh-server`, `cloud-init`.
+   - Adds NVIDIA CUDA repo, installs `nvidia-open` (open kernel module + userspace driver libs), `nvidia-container-toolkit`, `podman`, `openssh-server`, `cloud-init`.
    - Bakes in systemd units: `bootc-host-test.service`, `nvidia-cdi-refresh.service` + `.path`.
    - Bakes in Quadlets at `/usr/share/containers/systemd/`: `devpod.kube` + `devpod.yaml`.
    - Enables `sshd`, `cloud-init.target` (for downstream NoCloud-seed key injection), and the bootc-specific units above.
@@ -93,7 +88,7 @@ All three images are tagged under `quay.io/m0ranmcharles/fedora_init` with disti
 
 ## Known caveats when editing
 
-- `01_build_image/docs/image_build.md` and `image_readme.md` are **stale snapshots** of earlier file contents (they still reference `ghcr.io/YOURORG/...` placeholder images and an older Containerfile layout). Treat them as historical context, not source of truth. The live files under `build_assets/` are authoritative.
-- `01_build_image/docs/REVIEW_FINDINGS.md` flags two open issues that are still relevant: the `nvidia.com/gpu=all: 1` resource key syntax in `devpod.yaml` has not been validated against current Podman/NVIDIA-toolkit versions, and the pod pulls from Quay at boot (no preload mechanism).
-- `.gitignore` excludes `estimate_push_time.py` from commits even though it's tracked as an executable script in the repo root.
+- The `nvidia.com/gpu=all: 1` resource key syntax in `devpod.yaml` has not been validated against current Podman/NVIDIA-toolkit versions. First boot on real GPU hardware is the validation.
+- `nvidia-open` uses DKMS to build the kernel module at `dnf install` time, against whatever kernel the bootc base image ships. If `nvidia-smi` fails at boot or `/dev/nvidiactl` never appears, the fallback is either (a) add `kernel-devel` matching the base image's kernel, or (b) swap to RPM Fusion's `akmod-nvidia-open` so the build defers to first boot. See `gpu_integration_path.md`.
+- The pod pulls `dev-container` and `backup-container` images from Quay at boot; there is no preload mechanism, so a freshly booted VM needs network to start the pod.
 - `GEMINI.md` is a parallel project-context file for Gemini; keep it roughly in sync when architecture changes, but don't treat it as canonical over this file.
