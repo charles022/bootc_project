@@ -229,12 +229,9 @@ FROM quay.io/fedora/fedora-bootc:42
 
 RUN dnf -y install \
       podman \
-      nvidia-container-toolkit-base \
+      nvidia-open \
+      nvidia-container-toolkit \
     && dnf clean all
-
-# Add your chosen NVIDIA host driver packages here.
-# Example placeholder:
-# RUN dnf -y install nvidia-open && dnf clean all
 
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
 COPY gpu-dev.kube /usr/share/containers/systemd/gpu-dev.kube
@@ -748,12 +745,9 @@ FROM quay.io/fedora/fedora-bootc:42
 
 RUN dnf -y install \
       podman \
-      nvidia-container-toolkit-base \
+      nvidia-open \
+      nvidia-container-toolkit \
     && dnf clean all
-
-# Add your chosen NVIDIA host driver packages here.
-# Example placeholder only:
-# RUN dnf -y install nvidia-open && dnf clean all
 
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
 COPY gpu-dev.kube /usr/share/containers/systemd/gpu-dev.kube
@@ -769,8 +763,7 @@ RUN systemctl enable nvidia-cdi-refresh.service
 
 Notes:
 
-* `nvidia-container-toolkit-base` is sufficient for CDI generation because it includes `nvidia-ctk`; NVIDIA documents that base package as enough for CDI workflows. ([NVIDIA Docs][4])
-* The host driver package choice is separate from the Quadlet/CDI design. Your current design documents already treat the host driver and the container workload as separate layers.
+* `nvidia-open` installs the open-source kernel module plus the userspace driver libraries. `nvidia-container-toolkit` is the bridge layer that injects the driver into containers via CDI. Both are needed on the host.
 
 ---
 

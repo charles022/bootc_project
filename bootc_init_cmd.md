@@ -155,12 +155,13 @@ FROM quay.io/fedora/fedora-bootc:42
 
 RUN dnf -y install \
       podman \
-      nvidia-container-toolkit-base \
+      nvidia-open \
+      nvidia-container-toolkit \
     && dnf clean all
 
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
-COPY gpu-dev.kube /usr/share/containers/systemd/gpu-dev.kube
-COPY gpu-dev.yaml /usr/share/containers/systemd/gpu-dev.yaml
+COPY devpod.kube /usr/share/containers/systemd/devpod.kube
+COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
 RUN systemctl enable nvidia-cdi-refresh.service
 ```

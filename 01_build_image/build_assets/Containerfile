@@ -9,6 +9,7 @@ RUN dnf -y install 'dnf5-command(config-manager)' \
     && dnf -y install \
        openssh-server \
        podman \
+       nvidia-open \
        nvidia-container-toolkit \
        cloud-init \
        bash \
