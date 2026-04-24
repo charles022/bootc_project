@@ -29,7 +29,7 @@ Here's the actual recommended decomposition:
 Best for: the OS skeleton, daemons whose config lives in `/etc`, anything that needs deep system integration.
 
 ```dockerfile
-FROM quay.io/fedora/fedora-bootc:41
+FROM quay.io/fedora/fedora-bootc:42
 RUN dnf install -y openssh-server && \
     systemctl enable sshd
 COPY sshd_config_baseline /etc/ssh/sshd_config.d/99-custom.conf
@@ -52,7 +52,7 @@ Description=Workstation container
 After=network-online.target
 
 [Container]
-Image=ghcr.io/yourname/workstation:latest
+Image=quay.io/m0ranmcharles/fedora_init:dev-container
 AutoUpdate=registry
 Volume=/var/workstation-home:/home/user:Z
 Network=host          # or a named network
@@ -76,12 +76,12 @@ PodName=workstation
 # app.container
 [Container]
 Pod=workstation.pod
-Image=ghcr.io/yourname/workstation:latest
+Image=quay.io/m0ranmcharles/fedora_init:dev-container
 
 # proxy.container  
 [Container]
 Pod=workstation.pod
-Image=ghcr.io/yourname/nginx-proxy:latest
+Image=quay.io/m0ranmcharles/fedora_init:backup-container
 ```
 
 This is valid, but I'd push back on your specific SSH+workstation pod design. The shared-namespace benefit of pods is most useful when two processes need to talk over localhost without network overhead, or share IPC. SSH → workstation doesn't need that: you SSH to the host, then either `podman exec -it workstation bash` or configure SSH to drop you directly into the container via `ForceCommand`. The pod adds orchestration complexity without a clear gain here.

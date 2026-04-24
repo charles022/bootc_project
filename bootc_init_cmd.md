@@ -31,7 +31,7 @@ WantedBy=multi-user.target
 You will need to copy your script and the service file into the image, and then use `systemctl enable` so it is ready to go on boot.
 
 ```dockerfile
-FROM quay.io/fedora/fedora-bootc:40
+FROM quay.io/fedora/fedora-bootc:42
 
 # Copy your script
 COPY my-script.sh /usr/local/bin/my-script.sh
@@ -92,7 +92,7 @@ echo "Initialization complete."
 Now, copy both files into your image and enable the service just like before:
 
 ```dockerfile
-FROM quay.io/fedora/fedora-bootc:40
+FROM quay.io/fedora/fedora-bootc:42
 
 # 1. Copy the initialization script and make it executable
 COPY first-boot-setup.sh /usr/local/bin/first-boot-setup.sh
@@ -124,8 +124,8 @@ At minimum, the host image needs Podman, since Quadlet is part of the Podman/sys
 
 For image-provided system workloads, place them in the system Quadlet directory, for example:
 
-* `/usr/share/containers/systemd/gpu-dev.kube`
-* `/usr/share/containers/systemd/gpu-dev.yaml`
+* `/usr/share/containers/systemd/devpod.kube`
+* `/usr/share/containers/systemd/devpod.yaml`
 
 Quadlet reads these system files during boot and generates the corresponding `.service` units automatically. ([Podman Documentation][1])
 
@@ -166,7 +166,7 @@ COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 RUN systemctl enable nvidia-cdi-refresh.service
 ```
 
-And then `gpu-dev.kube` contains:
+And then `devpod.kube` contains:
 
 ```ini
 [Unit]
@@ -176,7 +176,7 @@ Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
 
 [Kube]
-Yaml=/usr/share/containers/systemd/gpu-dev.yaml
+Yaml=/usr/share/containers/systemd/devpod.yaml
 
 [Install]
 WantedBy=multi-user.target
@@ -249,7 +249,7 @@ That is more maintainable and more aligned with the documented model than trying
 ## Minimal example
 
 ```ini
-# /usr/share/containers/systemd/gpu-dev.kube
+# /usr/share/containers/systemd/devpod.kube
 [Unit]
 Description=GPU development container
 After=network-online.target nvidia-cdi-refresh.service
@@ -257,7 +257,7 @@ Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
 
 [Kube]
-Yaml=/usr/share/containers/systemd/gpu-dev.yaml
+Yaml=/usr/share/containers/systemd/devpod.yaml
 
 [Install]
 WantedBy=multi-user.target
