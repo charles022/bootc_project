@@ -1,166 +1,74 @@
-● Here's the core of what recommended_gpu_integration_path.md is actually saying, stripped down:
+# Why `.kube` Quadlets instead of `.container`
 
-  ---
-  The Problem It's Solving
+This is the one non-obvious choice in `gpu_integration_path.md`. Everything
+else — drivers on the host, CDI generated at boot, workload in a container —
+is standard. The `.kube` vs `.container` pick is worth explaining in its own
+doc.
 
-  You want containers running on your bootc system to use the GPU. There are two parts to that:
+## What a Quadlet actually is
 
-  1. The host OS needs the driver — the kernel module that talks to the hardware
-  2. Containers need a way to access the GPU device — containers are isolated, so they don't automatically
-   see it
+A Quadlet file is a config file that systemd reads and converts into a real
+systemd unit at boot. Instead of writing a full `podman run ...` command
+inside a systemd service file yourself, you write a declarative `.container`
+or `.kube` file and the Quadlet generator produces the systemd unit for you.
 
-  ---
-  The Three-Piece Solution
+## The obvious choice: `.container`
 
-  Piece 1: Drivers in the bootc image
+The natural way to run a container via Quadlet is a `.container` file:
 
-  Just a dnf install nvidia-open in the Containerfile. Nothing unusual — same as installing any other
-  software. The driver lives in the host OS layer, which is exactly where it belongs.
+```ini
+[Container]
+Image=nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu24.04
+AddDevice=/dev/nvidia0
+```
 
-  Piece 2: CDI — the "device handoff" spec
+`AddDevice=` maps directly to `podman run --device=`. It works fine for
+regular device paths like `/dev/nvidia0`. The problem: you don't want to
+hardcode device paths. You want `nvidia.com/gpu=all` — a CDI selector — so
+Podman handles device injection automatically regardless of how many GPUs
+exist or how they're numbered.
 
-  CDI (Container Device Interface) is a standard file at /etc/cdi/nvidia.yaml that describes the GPU to
-  the container runtime. Think of it as a manifest: "here's the device file, here are the libraries,
-  here's how to inject them into a container." Podman reads this file when starting a container that
-  requests a GPU.
+You can write `AddDevice=nvidia.com/gpu=all` in a `.container` file. It may
+even work. But Podman's official documentation for `.container` Quadlets
+describes `AddDevice=` as accepting device paths — not CDI selectors. That
+form is undocumented/untested in that context.
 
-  The catch: this file has to be generated at runtime (not build time), because it describes the actual
-  hardware present on the machine. So a oneshot systemd service runs nvidia-ctk cdi generate at every boot
-   to produce it.
+## The documented path: `.kube`
 
-  Piece 3: .kube Quadlets instead of .container Quadlets
+A `.kube` Quadlet doesn't run `podman run`. It runs `podman kube play`, which
+takes a Kubernetes-style Pod YAML. In that YAML, GPU access is requested
+like this:
 
-  This is the only "surprising" choice. A .container Quadlet has an AddDevice= option that could work for
-  GPUs, but it isn't officially documented to work with CDI selectors. The officially documented way to
-  say "give this container the GPU via CDI" is in Kubernetes-style YAML like:
+```yaml
+resources:
+  limits:
+    nvidia.com/gpu=all: 1
+```
 
-  resources:
-    limits:
-      nvidia.com/gpu=all: 1
+Podman's `kube play` documentation explicitly states that this syntax invokes
+CDI device selection. Same outcome — same CDI lookup — but this path is
+documented.
 
-  A .kube Quadlet is just a Quadlet that points to one of those YAML files instead of specifying
-  everything inline. So the indirection is: .kube file → .yaml file → container with GPU access. That's
-  the only reason the YAML files exist — to use the documented GPU selector syntax.
+## The indirection
 
-  ---
-  Why It Feels More Complex Than It Is
+```text
+devpod.kube                ← systemd reads this (when to run, dependencies, etc.)
+    │
+    └─► podman kube play devpod.yaml
+                │
+                └─► sees nvidia.com/gpu=all in resources.limits
+                            │
+                            └─► looks up /etc/cdi/nvidia.yaml
+                                        │
+                                        └─► injects GPU into container
+```
 
-  The doc uses train-job and inference-job as examples, which are oneshot batch jobs (run once, exit).
-  Your actual use case is a persistent workstation container (run until stopped). The mechanism is
-  identical — you'd just drop Type=oneshot and restartPolicy: Never.
+The two-file structure exists because `.kube` separates systemd concerns (the
+`.kube` file: start order, dependencies, install target) from container
+concerns (the `.yaml` file: what image, what command, what resources).
 
-  The doc is also heavily citation-driven because it's defending its choices. Strip those out and the
-  actual config is:
+## Bottom line
 
-  - ~10 lines in the Containerfile
-  - 1 small systemd service file
-  - 1 .kube quadlet file
-  - 1 kube YAML file
-
-  That's the whole thing.
-
-  ---
-  Mapped to Your README Goals
-
-  ┌──────────────────────────────────────┬────────────────────────────────────────────────────────────┐
-  │            README concept            │                   What this doc provides                   │
-  ├──────────────────────────────────────┼────────────────────────────────────────────────────────────┤
-  │ Items 14-16 (GPU passthrough         │ The CDI + .kube Quadlet pattern to validate                │
-  │ testing)                             │                                                            │
-  ├──────────────────────────────────────┼────────────────────────────────────────────────────────────┤
-  │ bootc image holds setup              │ Drivers + CDI service go in Containerfile                  │
-  ├──────────────────────────────────────┼────────────────────────────────────────────────────────────┤
-  │ Quadlets hold runtime services       │ .kube Quadlet runs the GPU container                       │
-  ├──────────────────────────────────────┼────────────────────────────────────────────────────────────┤
-  │ Future nvidia container              │ This is exactly that — a CUDA container managed by a       │
-  │                                      │ Quadlet                                                    │
-  └──────────────────────────────────────┴────────────────────────────────────────────────────────────┘
-
-  The doc is sound. The complexity is mostly prose + the train/inference framing making it look like a
-  batch ML system when what you're building is a persistent workstation + nvidia container setup.
-
-
-
-● Piece 3 in Depth: Why .kube Quadlets?
-
-  Start with what a Quadlet actually is
-
-  A Quadlet file is just a config file that systemd reads and converts into a real systemd unit at
-   boot. Instead of writing a full podman run ... command inside a systemd service file yourself,
-  you write a declarative .container or .kube file and the Quadlet generator produces the systemd
-  unit for you.
-
-  ---
-  The .container Quadlet — the obvious choice
-
-  The natural way to run a container via Quadlet is a .container file:
-
-  [Container]
-  Image=nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu24.04
-  AddDevice=/dev/nvidia0
-
-  AddDevice= maps directly to podman run --device=. It works fine for regular device paths like
-  /dev/nvidia0. The problem: you don't want to hardcode /dev/nvidia0. You want nvidia.com/gpu=all
-  — a CDI selector — so Podman handles device injection automatically regardless of how many GPUs
-  exist or how they're numbered.
-
-  You can write AddDevice=nvidia.com/gpu=all in a .container file. It may even work. But Podman's
-  official documentation for .container Quadlets describes AddDevice= as accepting device paths —
-  not CDI selectors. That format is undocumented/untested in that context.
-
-  ---
-  What CDI actually does when invoked
-
-  When Podman sees a CDI selector like nvidia.com/gpu=all, it:
-
-  1. Opens /etc/cdi/nvidia.yaml (generated at boot by nvidia-ctk)
-  2. Reads the spec for that device — which lists the exact device files, library mounts, and
-  environment variables needed
-  3. Injects all of that into the container automatically
-
-  The CDI spec is what makes the GPU request portable and declarative — you don't need to know
-  /dev/nvidia0 vs /dev/nvidia1 vs whatever.
-
-  ---
-  The .kube Quadlet — the documented path
-
-  A .kube Quadlet doesn't run podman run. It runs podman kube play, which takes a Kubernetes-style
-   Pod YAML. In that YAML, GPU access is requested like this:
-
-  resources:
-    limits:
-      nvidia.com/gpu=all: 1
-
-  Podman's kube play documentation explicitly states that this syntax invokes CDI device
-  selection. Same outcome — same CDI lookup — but this path is documented.
-
-  ---
-  The indirection mapped out
-
-  train-job.kube          ← systemd reads this (when to run, timeouts, etc.)
-      │
-      └─► podman kube play train-job.yaml
-                  │
-                  └─► sees nvidia.com/gpu=all in resources.limits
-                              │
-                              └─► looks up /etc/cdi/nvidia.yaml
-                                          │
-                                          └─► injects GPU into container
-
-  The two-file structure exists because .kube separates systemd concerns (the .kube file: start
-  order, timeouts, restart policy) from container concerns (the .yaml file: what image, what
-  command, what resources).
-
-  ---
-  The bottom line on Piece 3
-
-  The choice isn't about capability — it's about which path has explicit documentation backing it.
-   Both probably work. The .kube path is chosen because:
-
-  - CDI selectors in resources.limits are documented by Podman
-  - AddDevice=nvidia.com/gpu=all in a .container file is not
-
-  For your project, this means: wherever you want GPU access in a Quadlet-managed container (your
-  future nvidia container, the workstation container if it needs GPU), you use a .kube + .yaml
-  pair instead of a plain .container file. Everything else about how you structure the bootc image
-   and Quadlets stays the same.
+Both approaches probably work. The `.kube` path is chosen because CDI
+selectors in `resources.limits` are documented by Podman and
+`AddDevice=nvidia.com/gpu=all` in a `.container` file is not.

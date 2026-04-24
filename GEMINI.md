@@ -31,11 +31,18 @@ The build process involves three layers: the dev container, the backup sidecar, 
 ### Testing (VM)
 The project uses `bootc-image-builder` to convert the bootable container into a virtual disk.
 
+- **Build VM disk**:
+  ```bash
+  ./02_build_vm/build_vm.sh [IMAGE_NAME]
+  ```
+  *Defaults to `gpu-bootc-host:latest`. Converts the OCI image to qcow2 via
+  `bootc-image-builder` and installs it into the libvirt storage pool.*
 - **Run VM**:
   ```bash
-  ./02_build_vm/run_bootc_vm.sh [IMAGE_NAME]
+  ./02_build_vm/run_vm.sh
   ```
-  *Defaults to `gpu-bootc-host:latest`. Uses `qemu`/`virt-install` with UEFI boot.*
+  *Starts the VM with `virt-install` (UEFI boot), detects its IP, and writes
+  a `fedora-init` block into `~/.ssh/config` so you can `ssh fedora-init`.*
 
 ---
 
@@ -61,5 +68,5 @@ The project uses `bootc-image-builder` to convert the bootable container into a 
 - `gpu_integration_path.md`: Detailed strategy for NVIDIA/CDI integration.
 - `01_build_image/build_assets/Containerfile`: Primary definition for the bootc host image.
 - `01_build_image/build_assets/dev-container.Containerfile`: Definition for the development environment.
-- `02_build_vm/run_bootc_vm.sh`: Script for local VM validation.
+- `02_build_vm/build_vm.sh` + `02_build_vm/run_vm.sh`: Two-step flow for local VM validation.
 - `process_separation_model.md`: Explanation of when to use host vs. container services.

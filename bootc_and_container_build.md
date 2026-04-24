@@ -179,12 +179,12 @@ Because `train_smoke.py` must be present in the container from the start, the si
 Use a container build context like this:
 
 ```text
-gpu-dev-image/
-├── Containerfile
+01_build_image/build_assets/
+├── dev-container.Containerfile
 └── train_smoke.py
 ```
 
-## `gpu-dev-image/Containerfile`
+## `dev-container.Containerfile`
 
 Pin a specific NGC PyTorch tag in your pipeline. Example:
 
@@ -201,44 +201,41 @@ NVIDIA publishes PyTorch containers monthly and documents the available versions
 ## Build and push the dev image
 
 ```bash
-podman build -t ghcr.io/YOURORG/gpu-dev:stage1 ./gpu-dev-image
-podman push ghcr.io/YOURORG/gpu-dev:stage1
+podman build -t quay.io/m0ranmcharles/fedora_init:dev-container -f 01_build_image/build_assets/dev-container.Containerfile 01_build_image/build_assets/
+podman push quay.io/m0ranmcharles/fedora_init:dev-container
 ```
 
 The important part is that the image referenced by the Quadlet is already built and already contains `train_smoke.py`, so no in-VM setup is needed before you run it. That matches your requirement exactly. 
 
 # Artifact 2: bootc host image
 
-Use the same bootc host concept as before, but now point the workload at your custom `gpu-dev` image instead of a raw NVIDIA runtime image.
+Use the same bootc host concept as before, but now point the workload at your custom `dev-container` image instead of a raw NVIDIA runtime image.
 
 ## Bootc image build context
 
 ```text
-gpu-bootc/
+01_build_image/build_assets/
 ├── Containerfile
 ├── config.toml
 ├── nvidia-cdi-refresh.service
-├── gpu-dev.kube
-└── gpu-dev.yaml
+├── devpod.kube
+└── devpod.yaml
 ```
 
-## `gpu-bootc/Containerfile`
+## `01_build_image/build_assets/Containerfile`
 
 ```dockerfile
 FROM quay.io/fedora/fedora-bootc:42
 
 RUN dnf -y install \
       podman \
-      nvidia-container-toolkit-base \
+      nvidia-open \
+      nvidia-container-toolkit \
     && dnf clean all
 
-# Add your chosen NVIDIA host driver packages here.
-# Example placeholder:
-# RUN dnf -y install nvidia-open && dnf clean all
-
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
-COPY gpu-dev.kube /usr/share/containers/systemd/gpu-dev.kube
-COPY gpu-dev.yaml /usr/share/containers/systemd/gpu-dev.yaml
+COPY devpod.kube /usr/share/containers/systemd/devpod.kube
+COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
 RUN systemctl enable nvidia-cdi-refresh.service
 ```
@@ -272,14 +269,14 @@ From here on, all testing happens in a **VM first**, including the GPU container
 ## 1) Build the bootc host image
 
 ```bash
-podman build -t localhost/gpu-bootc:latest ./gpu-bootc
+podman build -t localhost/gpu-bootc-host:latest 01_build_image/build_assets/
 ```
 
 ## 2) Create a `config.toml` for VM login
 
 Use SSH key auth so you do not need plaintext passwords. The `bootc-image-builder` examples support injecting a user and SSH key through `config.toml`. ([GitHub][6])
 
-Example `gpu-bootc/config.toml`:
+Example `01_build_image/build_assets/config.toml`:
 
 ```toml
 [[customizations.user]]
@@ -293,20 +290,19 @@ groups = ["wheel"]
 ```bash
 mkdir -p output
 
-sudo podman pull localhost/gpu-bootc:latest || true
+sudo podman pull localhost/gpu-bootc-host:latest || true
 
 sudo podman run \
   --rm \
-  -it \
   --privileged \
-  --pull=newer \
-  --security-opt label=type:unconfined_t \
-  -v ./gpu-bootc/config.toml:/config.toml:ro \
   -v ./output:/output \
+  -v ./output/config.toml:/config.toml:ro \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
   quay.io/centos-bootc/bootc-image-builder:latest \
   --type qcow2 \
-  --local localhost/gpu-bootc:latest
+  --rootfs xfs \
+  --config /config.toml \
+  --local localhost/gpu-bootc-host:latest
 ```
 
 Fedora’s bootc docs and the upstream `bootc-image-builder` examples both show this overall pattern: run `bootc-image-builder` inside a privileged container, mount `/output`, mount the local container storage, and pass `--type qcow2`; the upstream examples also show using `config.toml` to inject a user and SSH key. ([GitHub][6])
@@ -345,7 +341,7 @@ That is the cleanest way to “enter and test from there” without relying on a
 
 # Quadlet and Pod YAML
 
-## `gpu-dev.kube` for stage 1
+## `devpod.kube` for stage 1
 
 ```ini
 [Unit]
@@ -355,12 +351,12 @@ Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
 
 [Kube]
-Yaml=/usr/share/containers/systemd/gpu-dev.yaml
+Yaml=/usr/share/containers/systemd/devpod.yaml
 ```
 
 Quadlet reads `.kube` units from `/usr/share/containers/systemd/` for distribution-provided system units and generates `.service` units at boot or after `systemctl daemon-reload`. ([Podman Documentation][1])
 
-## `gpu-dev.kube` for stages 2 and 3
+## `devpod.kube` for stages 2 and 3
 
 ```ini
 [Unit]
@@ -370,7 +366,7 @@ Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
 
 [Kube]
-Yaml=/usr/share/containers/systemd/gpu-dev.yaml
+Yaml=/usr/share/containers/systemd/devpod.yaml
 
 [Install]
 WantedBy=multi-user.target
@@ -378,18 +374,18 @@ WantedBy=multi-user.target
 
 The `[Install]` section is the only change needed to make the container start automatically at boot. ([Podman Documentation][1])
 
-## `gpu-dev.yaml` for stages 1 and 2
+## `devpod.yaml` for stages 1 and 2
 
 ```yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: gpu-dev
+  name: devpod
 spec:
   restartPolicy: Never
   containers:
-    - name: gpu-dev
-      image: ghcr.io/YOURORG/gpu-dev:stage1
+    - name: dev-container
+      image: quay.io/m0ranmcharles/fedora_init:dev-container
       command:
         - /bin/bash
         - -lc
@@ -404,7 +400,7 @@ spec:
 
 Podman’s kube-play GPU path is the documented place to use CDI GPU selectors such as `nvidia.com/gpu=all` through `resources.limits`. ([Fedora Project Documentation][4])
 
-## `gpu-dev.yaml` for stage 3
+## `devpod.yaml` for stage 3
 
 For stage 3, change only the command:
 
@@ -412,12 +408,12 @@ For stage 3, change only the command:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: gpu-dev
+  name: devpod
 spec:
   restartPolicy: Never
   containers:
-    - name: gpu-dev
-      image: ghcr.io/YOURORG/gpu-dev:stage1
+    - name: dev-container
+      image: quay.io/m0ranmcharles/fedora_init:dev-container
       command:
         - /bin/bash
         - -lc
@@ -451,9 +447,9 @@ This validates the guest-side driver and CDI generation, which is the prerequisi
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl start gpu-dev.service
+sudo systemctl start devpod.service
 sudo podman ps
-sudo podman exec -it gpu-dev-gpu-dev /bin/bash
+sudo podman exec -it devpod-dev-container /bin/bash
 cd /workspace
 ./train_smoke.py
 ```
@@ -464,15 +460,15 @@ Enable the service once:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable gpu-dev.service
-sudo systemctl start gpu-dev.service
+sudo systemctl enable devpod.service
+sudo systemctl start devpod.service
 ```
 
 After reboot, the container should already be running:
 
 ```bash
 sudo podman ps
-sudo podman exec -it gpu-dev-gpu-dev /bin/bash
+sudo podman exec -it devpod-dev-container /bin/bash
 cd /workspace
 ./train_smoke.py
 ```
@@ -482,8 +478,8 @@ cd /workspace
 After boot:
 
 ```bash
-sudo systemctl status gpu-dev.service
-sudo podman logs gpu-dev-gpu-dev
+sudo systemctl status devpod.service
+sudo podman logs devpod-dev-container
 ```
 
 You should see `train_smoke.py` run automatically on container startup. Quadlet-generated services are managed directly through `systemctl`, and Podman containers can be inspected with normal `podman ps` and `podman logs` flows. ([Podman Documentation][1])
@@ -623,18 +619,18 @@ After these additions, the path becomes:
 
 ## 1) Manual container start, manual entry, manual job
 
-* build/push `ghcr.io/YOURORG/gpu-dev:stage1` with `train_smoke.py` baked in
+* build/push `quay.io/m0ranmcharles/fedora_init:dev-container` with `train_smoke.py` baked in
 * build bootc host image
 * convert bootc host image to qcow2
 * boot qcow2 as a VM
 * SSH into the VM
-* manually start `gpu-dev.service`
+* manually start `devpod.service`
 * `podman exec` into the container
 * run `./train_smoke.py`
 
 ## 2) Automatic container start, manual entry, manual job
 
-* same as above, but add `[Install]` to `gpu-dev.kube`
+* same as above, but add `[Install]` to `devpod.kube`
 * enable the service
 * after reboot, SSH into the VM, `podman exec` in, run `./train_smoke.py`
 
@@ -726,11 +722,11 @@ That is the documented GPU-enablement path. The only thing that changes across t
 Use a directory like this:
 
 ```text
-gpu-bootc/
+01_build_image/build_assets/
 ├── Containerfile
 ├── nvidia-cdi-refresh.service
-├── gpu-dev.kube
-├── gpu-dev.yaml
+├── devpod.kube
+├── devpod.yaml
 ├── bootc_host_test.sh
 └── dev_container_test.py
 ```
@@ -748,16 +744,13 @@ FROM quay.io/fedora/fedora-bootc:42
 
 RUN dnf -y install \
       podman \
-      nvidia-container-toolkit-base \
+      nvidia-open \
+      nvidia-container-toolkit \
     && dnf clean all
 
-# Add your chosen NVIDIA host driver packages here.
-# Example placeholder only:
-# RUN dnf -y install nvidia-open && dnf clean all
-
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
-COPY gpu-dev.kube /usr/share/containers/systemd/gpu-dev.kube
-COPY gpu-dev.yaml /usr/share/containers/systemd/gpu-dev.yaml
+COPY devpod.kube /usr/share/containers/systemd/devpod.kube
+COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
 # Stage 3 only:
 COPY run-gpu-smoke.sh /usr/local/bin/run-gpu-smoke.sh
@@ -769,8 +762,7 @@ RUN systemctl enable nvidia-cdi-refresh.service
 
 Notes:
 
-* `nvidia-container-toolkit-base` is sufficient for CDI generation because it includes `nvidia-ctk`; NVIDIA documents that base package as enough for CDI workflows. ([NVIDIA Docs][4])
-* The host driver package choice is separate from the Quadlet/CDI design. Your current design documents already treat the host driver and the container workload as separate layers.
+* `nvidia-open` installs the open-source kernel module plus the userspace driver libraries. `nvidia-container-toolkit` is the bridge layer that injects the driver into containers via CDI. Both are needed on the host.
 
 ---
 
@@ -796,7 +788,7 @@ This is what makes the host GPU available to CDI-aware Podman workloads. NVIDIA 
 
 ---
 
-## 3) Quadlet: `gpu-dev.kube`
+## 3) Quadlet: `devpod.kube`
 
 This file remains nearly identical across all three stages.
 
@@ -808,7 +800,7 @@ Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
 
 [Kube]
-Yaml=/usr/share/containers/systemd/gpu-dev.yaml
+Yaml=/usr/share/containers/systemd/devpod.yaml
 ```
 
 For Stage 2 and Stage 3, you will add an `[Install]` section so it starts automatically. Podman documents `.kube` Quadlets as a supported Quadlet type consumed by the systemd generator. ([Podman Documentation][5])
@@ -821,7 +813,7 @@ For Stage 2 and Stage 3, you will add an `[Install]` section so it starts automa
 
 This is the first target state.
 
-## 4A) Pod YAML for Stage 1: `gpu-dev.yaml`
+## 4A) Pod YAML for Stage 1: `devpod.yaml`
 
 Use a long-lived idle command so the container stays up and you can enter it later.
 
@@ -829,11 +821,11 @@ Use a long-lived idle command so the container stays up and you can enter it lat
 apiVersion: v1
 kind: Pod
 metadata:
-  name: gpu-dev
+  name: devpod
 spec:
   restartPolicy: Never
   containers:
-    - name: gpu-dev
+    - name: dev-container
       image: nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu24.04
       command:
         - /bin/sh
@@ -856,7 +848,7 @@ The important parts are:
 ## 5A) Build the image
 
 ```bash
-podman build -t localhost/gpu-bootc:latest .
+podman build -t localhost/gpu-bootc-host:latest .
 ```
 
 Fedora bootc uses standard container build workflows for derived images. ([Fedora Docs][3])
@@ -884,8 +876,8 @@ These validate the three prerequisite layers:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl start gpu-dev.service
-sudo systemctl status gpu-dev.service
+sudo systemctl start devpod.service
+sudo systemctl status devpod.service
 ```
 
 Quadlet-generated units appear after `daemon-reload`, and the `.kube` unit starts the Podman kube workload. ([Podman Documentation][5])
@@ -896,7 +888,7 @@ The simplest practical method is to use Podman exec rather than SSH at this stag
 
 ```bash
 sudo podman ps
-sudo podman exec -it gpu-dev-gpu-dev /bin/sh
+sudo podman exec -it devpod-dev-container /bin/sh
 ```
 
 The exact generated container name can vary a little depending on pod/container naming, so `podman ps` is the safe first check. This stage is about proving the container is GPU-capable and usable as a dev shell, not about in-container SSH yet. Podman’s standard workflow supports interactive `exec` into running containers. ([Fedora Docs][6])
@@ -931,7 +923,7 @@ Nothing here depends on auto-start or auto-executed jobs. That is why Stage 1 is
 
 Stage 2 should change **only one thing**: the container starts automatically at boot.
 
-## 4B) Update `gpu-dev.kube`
+## 4B) Update `devpod.kube`
 
 Add the install section:
 
@@ -943,7 +935,7 @@ Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
 
 [Kube]
-Yaml=/usr/share/containers/systemd/gpu-dev.yaml
+Yaml=/usr/share/containers/systemd/devpod.yaml
 
 [Install]
 WantedBy=multi-user.target
@@ -957,8 +949,8 @@ After booting the image:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable gpu-dev.service
-sudo systemctl start gpu-dev.service
+sudo systemctl enable devpod.service
+sudo systemctl start devpod.service
 ```
 
 Or, if baked and enabled in your image workflow, it will already come up at boot. The important conceptual point is that **Stage 2 is just service enablement**. It does not alter the GPU/CDI path. ([Podman Documentation][5])
@@ -966,14 +958,14 @@ Or, if baked and enabled in your image workflow, it will already come up at boot
 ## 6B) After reboot
 
 ```bash
-sudo systemctl status gpu-dev.service
+sudo systemctl status devpod.service
 sudo podman ps
 ```
 
 You should now see the container already running after boot. Then you enter it the same way as Stage 1:
 
 ```bash
-sudo podman exec -it gpu-dev-gpu-dev /bin/sh
+sudo podman exec -it devpod-dev-container /bin/sh
 ```
 
 And run your jobs manually from inside. Because the Pod YAML still uses `sleep infinity`, the container behaves like a development environment rather than a batch job container. ([Podman Documentation][5])
@@ -1037,7 +1029,7 @@ sys.exit(0)
 
 In your real test image, replace that with an actual GPU-using framework test. The principle is what matters here: the automatic job is just the container command path, layered on top of the already-proven GPU container startup path. ([NVIDIA Docs][1])
 
-## 6C) Update `gpu-dev.yaml`
+## 6C) Update `devpod.yaml`
 
 Replace the idle command with the smoke-test wrapper:
 
@@ -1045,11 +1037,11 @@ Replace the idle command with the smoke-test wrapper:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: gpu-dev
+  name: devpod
 spec:
   restartPolicy: Never
   containers:
-    - name: gpu-dev
+    - name: dev-container
       image: nvcr.io/nvidia/cuda:12.6.3-runtime-ubuntu24.04
       command:
         - /bin/sh
@@ -1077,9 +1069,9 @@ That is the cleanest representation of your production-test goal. ([NVIDIA Docs]
 ## 7C) Validate after boot
 
 ```bash
-sudo systemctl status gpu-dev.service
-sudo journalctl -u gpu-dev.service -b
-sudo podman logs gpu-dev-gpu-dev
+sudo systemctl status devpod.service
+sudo journalctl -u devpod.service -b
+sudo podman logs devpod-dev-container
 ```
 
 Those logs should show:
@@ -1098,14 +1090,14 @@ That gives you exactly the kind of automated validation gate you described befor
 
 Use:
 
-* `gpu-dev.kube` **without** `[Install]`
-* `gpu-dev.yaml` with `sleep infinity`
+* `devpod.kube` **without** `[Install]`
+* `devpod.yaml` with `sleep infinity`
 
 Then:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl start gpu-dev.service
+sudo systemctl start devpod.service
 sudo podman exec -it <container-name> /bin/sh
 ```
 
@@ -1115,13 +1107,13 @@ That gives you a GPU-capable dev container, but nothing auto-starts except the C
 
 Use:
 
-* `gpu-dev.kube` **with** `[Install] WantedBy=multi-user.target`
-* `gpu-dev.yaml` still with `sleep infinity`
+* `devpod.kube` **with** `[Install] WantedBy=multi-user.target`
+* `devpod.yaml` still with `sleep infinity`
 
 Then enable the service:
 
 ```bash
-sudo systemctl enable gpu-dev.service
+sudo systemctl enable devpod.service
 ```
 
 Now the container starts on boot, but it still just waits for you. You enter it manually and run whatever you want. ([Podman Documentation][5])
@@ -1130,8 +1122,8 @@ Now the container starts on boot, but it still just waits for you. You enter it 
 
 Use:
 
-* `gpu-dev.kube` **with** `[Install]`
-* `gpu-dev.yaml` with a command that runs your wrapper script
+* `devpod.kube` **with** `[Install]`
+* `devpod.yaml` with a command that runs your wrapper script
 * `run-gpu-smoke.sh` to run `nvidia-smi` plus your tiny training/inference smoke test
 
 Now booting the system automatically runs the GPU-capable test container and the GPU-powered job. ([NVIDIA Docs][2])

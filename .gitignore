@@ -20,4 +20,3 @@ venv/
 
 # Project-specific temporary files
 *.tmp
-estimate_push_time.py
