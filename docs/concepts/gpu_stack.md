@@ -53,13 +53,40 @@ resources:
 
 *(See `01_build_image/build_assets/devpod.yaml` in the repo for the authoritative version.)*
 
-Podman's `kube play` formally documents this selector syntax. A standard `.container` Quadlet relies on `AddDevice=`, which accepts direct device paths but lacks an equivalent stable selector mechanism for CDI.
+Podman's `kube play` formally documents this selector syntax. A standard `.container` Quadlet relies on `AddDevice=`, which accepts direct device paths but lacks an equivalent stable selector mechanism for CDI. The literal equivalent — `AddDevice=nvidia.com/gpu=all` in a `.container` file — may work in practice but is not formally documented for CDI selectors, so we take the documented `.kube` path.
+
+### Boot-time flow
+
+```text
+devpod.kube                       # systemd reads this (when to run, deps)
+    |
+    v
+systemd Quadlet generator         # at boot, and on `systemctl daemon-reload`
+    |
+    v
+podman kube play devpod.yaml      # generated devpod.service runs this
+    |
+    v
+sees nvidia.com/gpu=all in resources.limits
+    |
+    v
+reads /etc/cdi/nvidia.yaml        # produced by nvidia-cdi-refresh.service
+    |
+    v
+injects /dev/nvidia* into pod
+```
 
 ## Known risks
 
 ### DKMS at build time
 
 The `nvidia-open` package builds the kernel module via DKMS during `dnf install`, pinning against the bootc base image's running kernel. If the deployed host runs a different kernel, the module will not load. The fallback paths are either installing `kernel-devel` matching the base image's kernel, or swapping to RPM Fusion's `akmod-nvidia-open` to trigger the build at first boot.
+
+### Why `nvidia-open` over the alternatives
+
+- `cuda-drivers` (NVIDIA's proprietary kernel module path) is rejected because the open kernel module is NVIDIA's documented forward direction on Fedora and avoids the proprietary licensing surface for a workstation image we publish to a public registry.
+- `akmod-nvidia` (RPM Fusion proprietary) is rejected for the same proprietary-path reason; `akmod-nvidia-open` remains the deferred-build fallback if the in-Containerfile DKMS path proves unreliable.
+- The toolkit/driver split keeps userspace CUDA inside the workload container via `nvidia-container-toolkit` + CDI, rather than exposing CUDA on the host. This avoids tying application lifecycles to the host driver lifecycle.
 
 ### CDI selector syntax not validated
 

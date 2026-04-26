@@ -27,6 +27,10 @@ This enforces strict state separation: binaries and unit files belong in the ima
 Because `/usr` is mounted read-only on the host, imperative `dnf install` commands do not work. Traditional `dnf` and DKMS are used exclusively inside the container build process to assemble the static image.
 
 On the deployed host, package management is handled by image updates rather than live mutation.
+
+#### The reboot tax
+
+The trade-off for atomic, rollback-capable updates is that new packages cannot take effect immediately — `/usr` is read-only, so a freshly added binary requires either a layered image rebuild followed by a reboot, or a transient overlay. The canonical example is `tcpdump`: traditionally you would `dnf install tcpdump` and use it on the spot. On bootc you either layer it into the image and reboot, run it from a transient `bootc usroverlay`, or invoke it from a one-off container — never the in-place install.
 - `bootc upgrade` fetches and stages the newest version of the current image.
 - `bootc switch` changes the system to a different image or a local OCI archive.
 - `bootc usroverlay` mounts a temporary, writable overlay over `/usr` for transient debugging. The overlay and any changes made within it are discarded on the next reboot.

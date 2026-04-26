@@ -44,5 +44,6 @@
 - [how-to/distribute_image.md](how-to/distribute_image.md) — Instructions for a third party to boot the published image with their own SSH key.
 - [how-to/push_to_quay.md](how-to/push_to_quay.md) — Guide for publishing the built images to the Quay registry.
 - [how-to/run_locally.md](how-to/run_locally.md) — Steps to run an ephemeral root shell in the host image without a virtual machine.
+- [how-to/staged_validation.md](how-to/staged_validation.md) — Three-stage process for validating the dev pod by peeling back manual steps as automation is verified.
 - [how-to/validate_gpu.md](how-to/validate_gpu.md) — End-to-end verification of GPU passthrough from host driver to the dev container.
 - [how-to/write_a_systemd_unit_for_the_host.md](how-to/write_a_systemd_unit_for_the_host.md) — Recipe for adding and enabling new host-level services in the image.

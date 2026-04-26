@@ -68,3 +68,30 @@ All images are "keyless" by design. They do not contain embedded SSH keys, API c
 
 ### Source of truth
 The Containerfiles in the repository are the authoritative definitions for these images. Code excerpts in this documentation are for illustrative purposes only.
+
+## Appendix: NVIDIA NGC catalog
+
+Reference summary of the relevant tag families on `nvcr.io/nvidia/`. Use this when picking a base image for a new container.
+
+### CUDA base images — `nvcr.io/nvidia/cuda:<version>-<variant>-<distro>`
+| Variant | When to use |
+|---|---|
+| `base` | Minimal CUDA runtime; smallest footprint, no math libs. |
+| `runtime` | Adds cuBLAS, cuFFT, NCCL — for running pre-built CUDA binaries. |
+| `runtime-cudnn` | Adds cuDNN for inference workloads that need it. |
+| `devel` | Adds compiler and headers — for building CUDA code. Common in multi-stage builds. |
+| `devel-cudnn` | Full development stack with cuDNN. |
+
+### Framework images
+| Image | When to use |
+|---|---|
+| `nvcr.io/nvidia/pytorch:<tag>` | Pre-tuned PyTorch + CUDA + cuDNN + NCCL for training. The dev container's base. |
+| `nvcr.io/nvidia/tensorflow:<tag>` | TensorFlow equivalent. |
+| `nvcr.io/nvidia/cuda-dl-base:<tag>` | Foundation layer with cuDNN, cuTensor, NCCL, and the CUDA Toolkit — for custom DL stacks. |
+
+### Inference / serving images
+| Image | When to use |
+|---|---|
+| `nvcr.io/nvidia/tritonserver:<tag>` | Triton Inference Server for multi-framework model serving. |
+| `nvcr.io/nvidia/tensorrt:<tag>` | TensorRT-optimized inference runtime. |
+| `nvcr.io/nvidia/vllm:<tag>` | vLLM, optimized for GPU-accelerated LLM inference. |

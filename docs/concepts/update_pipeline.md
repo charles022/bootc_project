@@ -19,7 +19,7 @@ Heavy dependencies like package managers, DKMS, and CUDA repository metadata liv
 By routing the artifact through `/run` (tmpfs), the massive OCI archive and intermediate container layers never touch persistent storage. Only the byte-for-byte delta of modified files is written to the host's `/usr` partition during the `bootc switch` phase. Managing persistent `/var` state via btrfs snapshots during this process is `(planned)`.
 
 ### Rollbacks are instantaneous and safe
-Because the compilation happens offline and the staging is atomic, the live system is never subjected to mid-air mutations. If an update introduces instability, the previous deployment remains perfectly intact. `bootc rollback` simply flips the active deployment pointer back to the previous set of hardlinks, restoring the older system state instantly upon reboot.
+Because the compilation happens offline and the staging is atomic, the live system is never subjected to mid-air mutations. If an update introduces instability, the previous deployment remains perfectly intact. `bootc rollback` simply flips the active deployment pointer back to the previous set of hardlinks, restoring the older system state instantly upon reboot. The previous deployment can also be selected interactively from the GRUB menu at boot, which is the recovery path when the new deployment fails before login is reachable.
 
 ### Updates do not require an upstream registry
 The local rebuild pipeline ensures the workstation can update itself without relying on external registries to compute the artifact. Once the locally built image proves successful by booting, the first-boot push mechanism synchronizes it back to Quay for other machines.

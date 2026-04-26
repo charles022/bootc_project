@@ -10,6 +10,14 @@ Quadlet files in this project are baked into the **host image** during the build
 * **Mutable/Local:** Files placed at `/etc/containers/systemd/` are mutable but subject to three-way merges during bootc updates.
 * **User-scoped:** Quadlets can also live in `~/.config/containers/systemd/` for services that should run under a specific user session (not used in the current host image).
 
+## Lifecycle
+
+The Quadlet generator runs at boot and on `systemctl daemon-reload`. Editing a `.kube`, `.container`, `.pod`, or referenced `.yaml` file under `/etc/containers/systemd/` followed by `sudo systemctl daemon-reload` regenerates the corresponding `.service` without a reboot. Files baked into `/usr/share/containers/systemd/` change only via a host image update.
+
+## Container image updates independent of the OS
+
+Adding `AutoUpdate=registry` to a `.container` (or a `.kube`'s referenced manifest, where supported) lets `podman auto-update` (manual or via its systemd timer) refresh the container image on its own cadence. This is orthogonal to the bootc OS update path — the host image lifecycle and the workload container lifecycles are decoupled.
+
 ## The .kube vs. .container choice
 
 This project uses a `.kube` Quadlet rather than a `.container` Quadlet. This choice was made specifically to enable the use of CDI (Container Device Interface) selectors (`nvidia.com/gpu=all`) within a standard Kubernetes Pod manifest. This ensures that the GPU request follows a documented path supported by Podman's `kube play` functionality. For more details on this architectural decision, see `concepts/gpu_stack.md`.
@@ -106,3 +114,7 @@ A placeholder sidecar used for validating pod wiring and persistence.
       workingDir: /workspace
 ```
 * This container runs alongside the **dev container** in the same network and IPC namespace.
+
+### Keepalive in the container command
+
+The dev container's startup script ends with `tail -f /dev/null` (the equivalent of `sleep infinity`) so the container stays alive after the smoke test exits and remains reachable via `podman exec`. Without it, the pod would terminate as soon as the smoke test returned, and `restartPolicy: Always` would loop it.

@@ -36,7 +36,7 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Env vars / args**: `IMAGE_NAME` (optional arg, defaults to `gpu-bootc-host:latest`), `VM_NAME` (optional env var), `SSH_PUB_KEY_FILE` (optional env var).
 - **Preconditions**: Requires `bootc-image-builder`, `libvirt`, and `sudo` access.
 - **Side effects**: Generates a `config.toml` with injected SSH keys, creates a `qcow2` image, and copies it to `/var/lib/libvirt/images/`.
-- **Notes**: Automatically detects and injects the local user's SSH public key into the VM's `root` account.
+- **Notes**: Automatically detects and injects the local user's SSH public key into the VM's `root` account. The script pipes the host image through `podman save | sudo podman load` because rootful `bootc-image-builder` reads from root's container storage, which is a separate path from the user's rootless storage; without the hand-off, the rootful builder cannot see a rootless-built image.
 
 ### `02_build_vm/run_vm.sh`
 - **Path**: `02_build_vm/run_vm.sh`

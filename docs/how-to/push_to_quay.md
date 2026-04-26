@@ -40,6 +40,15 @@ Quay requires an encrypted password for CLI authentication.
    ```
    The script re-tags the local `gpu-bootc-host:latest` and pushes all four images using the `--format v2s2` flag required by bootc.
 
+## Manual fallback
+
+When not invoking `push_images.sh`, tag and push by hand. The format is `quay.io/[namespace]/[repo]:[tag]`, and `--format v2s2` is required so bootc can consume the resulting image:
+
+```bash
+podman tag <local-image> quay.io/m0ranmcharles/fedora_init:<tag>
+podman push --format v2s2 quay.io/m0ranmcharles/fedora_init:<tag>
+```
+
 ## Verify
 - Observe the script output for the "Push Complete" message.
 - Visit `https://quay.io/repository/m0ranmcharles/fedora_init?tab=tags` and verify that all four tags are present with recent timestamps.

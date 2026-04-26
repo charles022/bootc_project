@@ -49,6 +49,9 @@
 23. automate backup: system btrfs backup compress/encrypt -> cloud
 24. automate recovery: cloud -> sys-btrfs
 
+### composition
+25. layered host images (planned) — additional machine roles can be built as `FROM quay.io/m0ranmcharles/fedora_init:latest` Containerfiles that add role-specific packages, units, and Quadlets on top of the base host. This keeps a single base image canonical while letting other machines (e.g., a build host, a serving host) diverge by addition rather than fork.
+
 ## Open questions
 - in the bootc image build, we can provide --fs ext4 (or ideally btrfs). can/should we provide btrfs so that we can use as a true sys admin/root?
 - can we build w/o root?
