@@ -1,385 +1,45 @@
+# Documentation
 
-This is the whitepaper for our project. The document ostree_notes.md contains some recommendations about the project, and all other documents should be a dedicated document for each piece of the Checklist/Plan section of this document.
+## Start here
+- [overview.md](overview.md) — Project vision, the 3-layer model, and the rationale for a bootc-based GPU workstation.
 
+## By role
+- **I want to use the published image**
+  - [how-to/distribute_image.md](how-to/distribute_image.md)
+  - [concepts/access_model.md](concepts/access_model.md)
+- **I want to build and test locally**
+  - [how-to/build_images.md](how-to/build_images.md)
+  - [how-to/build_and_run_vm.md](how-to/build_and_run_vm.md)
+  - [how-to/validate_gpu.md](how-to/validate_gpu.md)
+- **I want to understand why it's built this way**
+  - [overview.md](overview.md)
+  - [concepts/](concepts/)
 
-## goal, purpose
-- high level process:
-    - develop on the system, experiment, build
-        - install software, update configs, build artifacts, etc as needed
-    - functional/stable system components are moved to fedora_init as installation/setup scripts
-    - all software in development is saved on remote git repo
-    - periodically wipe entire system, reinitialize environment using fedora_init
-    - anything created during experimentation/dev and not explicitly saved to fedora_init is wiped
-- purpose:
-    - recreates system environement
-    - removes any transient files from the previous environment
-        - old files can be reference via separate backup as needed
-    - this keeps the workspace clean
-    - removes any software not intentionally saved to fedora_init
-    - all software up to date with minimal dependencies
-- current implementation:
-    - maintain a set of scripts (fedora_init) to setup our system from scratch
-    - to wipe/reinitialize...
-    - save all files as a compressed backup to a separate location
-    - save fedora_init to a separate USB
-        - place minimal init setup of fedora_init on USB
-        - init setup script pulls the rest of fedora_init from remote git repo
-    - flash the latest Fedora OS to a separate USB
-    - install OS on the machine via USB
-    - wipe the drive during installing
-    - run fedora_init to setup environment
-        - USB content does...
-        - authenticates the user
-        - pulls full fedora_init from remote repo
-        - runs full fedora_init on system
-- implementation we are building: bootc image of Fedora + containerized environments and componets
-    - image:
-        - core Fedora bootc image
-        - + software installation/configuration
-        - + systemd services for host boot functions and hardware orchestration
-        - + podman quadlets (.kube, create systemd services) for container orchestration
-        - + pods for container integration
-        - + dev environment container for user environment
-        - + container for backup functionality
-    - scheduled update pipeline: rebuild and deploy the image to the ostree
-        - see *immutable_os_deployment_pipeline.md*
-        - build the image in a ephemeral container
-        - write the image to ram
-        - host system pushes the image from ram to ostree
-        - ostree stores images with delta updates
-            - storage architecture is a content-addressed object store
-            - uses delta updates via file-level hardlinking for saving space
-        - optional: push image to quay
-        - purpose...
-        - image builds are in a container
-            - container building the image will contain everything needed
-            - identical builds across different (original) host OSs
-            - no artifacts left on the host system
-        - interim/experimental updates can go through with dnf or rpm-ostree
-            - see *ostree_architecture.md*
-            - reoccurring image build installs/updates through dnf
-            - potential opportunity for rpm-ostree updates
-                - faster and more efficient image updates
-                - small drift against pre-built images
-                - more technically intricate system config merges w/ user additions to files
-                - may not work with kernel module and driver updates (nvidia, cuda)
+## Full index
+- [overview.md](overview.md) — Project vision, the 3-layer model, and the rationale for a bootc-based GPU workstation.
+- [roadmap.md](roadmap.md) — Current progress, the 24-item project checklist, and open design questions.
 
+### Concepts
+- [concepts/access_model.md](concepts/access_model.md) — The keyless image strategy and the three paths for injecting credentials at deployment.
+- [concepts/bootc_and_ostree.md](concepts/bootc_and_ostree.md) — How bootc and OSTree provide an immutable, versioned filesystem for the host OS.
+- [concepts/gpu_stack.md](concepts/gpu_stack.md) — Architectural split of NVIDIA drivers, toolkit, and CDI across host and container layers.
+- [concepts/ownership_model.md](concepts/ownership_model.md) — The 3-layer division of responsibility between the host, containers, and Quadlets.
+- [concepts/state_and_persistence.md](concepts/state_and_persistence.md) — Categorization of system state into four persistence levels across host and containers.
+- [concepts/update_pipeline.md](concepts/update_pipeline.md) — The automated ephemeral-build and staging process for host image updates.
 
-        
-    
+### Reference
+- [reference/images.md](reference/images.md) — Factual catalog of the host, dev, backup, and builder container images.
+- [reference/quadlets.md](reference/quadlets.md) — Explanation of Quadlet placement rules and their role in bridging systemd and Podman.
+- [reference/registry.md](reference/registry.md) — Configuration details for the Quay.io namespace and image tagging conventions.
+- [reference/repository_layout.md](reference/repository_layout.md) — Descriptive catalog of the directories, files, and top-level scripts in the repository.
+- [reference/scripts.md](reference/scripts.md) — Reference catalog of the shell and Python scripts for building and maintaining the system.
+- [reference/systemd_units.md](reference/systemd_units.md) — Catalog of project-specific systemd units and native host services enabled in the image.
 
-
-
-
-
-
-      setup goes directly into the bootc image Containerfile
-      
-      pipeline that runs weekly to rebuild the image (which will pull the latest
-      version of all software during the build, including the latest quadlets and
-      container images), push the newly built image to quay, then refresh the system
-      with that latest image. We will then, manually or through an automated schedule,
-      reboot to the latest image on a weekly basis. One of the quadlets we will
-      incorporate will be a workstation image and container for using the system in
-      day to day operation. We will be using btrfs send to save snapshots of our work,
-      while allowing all but a couple specific directories to be kept clean. We will
-      keep the container persistent so that installed software is kept, but we also
-      have the option to save the containers in their state, back them up,
-      then redeploy as freshly built containers, potentially after placing some of
-      those changes into the next workstation image build. We'll be creating
-      scheduled cron jobs or systemd timers to backup snapshots of the workstation
-      directories to our separate larger drive on the same system. Those btrfs
-      backups will remain untouched. We will periodically compress and encrypt
-      these backups then push them to the cloud at longer intervals. 
-
-
-## Access
-
-The published OCI image is intentionally keyless: no SSH keys, no passwords,
-no per-user identity is baked in. Credentials are injected at deployment
-time, so the same image on Quay is safe to share publicly.
-
-Console root autologin on tty1 (`autologin.conf`) is baked in as a recovery
-fallback. It requires the virtual console, not the network, so it does not
-compromise published images.
-
-Three supported access paths:
-
-### 1. Explore the image locally (no network, no SSH)
-```bash
-./run_container.sh
-```
-Drops you into a root bash shell inside the host image — no systemd, no SSH,
-no services. Useful for poking at installed packages and file layouts.
-
-### 2. Build and SSH into a VM from this machine
-Two steps, so you can reboot the VM without re-converting the OCI image:
-```bash
-./02_build_vm/build_vm.sh   # auto-detects ~/.ssh/id_ed25519.pub (or id_rsa.pub),
-                            # injects it into the qcow2 via bootc-image-builder,
-                            # installs the disk into /var/lib/libvirt/images/
-./02_build_vm/run_vm.sh     # tears down any prior VM, boots a fresh one,
-                            # detects its IP, writes a 'fedora-init' block
-                            # into ~/.ssh/config
-ssh fedora-init             # connects with your existing key
-```
-Override the key lookup with `SSH_PUB_KEY_FILE=/path/to/key.pub` on either
-script. Re-running `run_vm.sh` alone rebuilds the VM from the existing disk
-without going through `bootc-image-builder` again.
-
-### 3. Anyone else downloads the image and boots it (cloud-init)
-The image ships with `cloud-init` installed and enabled. A downstream user
-who has a pre-built qcow2/ISO doesn't need to rebuild anything — they create
-a NoCloud seed with their own SSH key and attach it at boot:
-```bash
-# user-data with their key
-cat > user-data <<EOF
-#cloud-config
-users:
-  - name: root
-    ssh_authorized_keys:
-      - ssh-ed25519 AAAA... their-key
-EOF
-echo "instance-id: iid-local01
-local-hostname: bootc-vm" > meta-data
-
-# build a NoCloud seed.iso
-cloud-localds seed.iso user-data meta-data
-
-# attach it to the VM (example with virt-install)
-virt-install ... --disk path=disk.qcow2 --disk path=seed.iso,device=cdrom
-```
-First boot, cloud-init picks up the seed and writes their key into root's
-`authorized_keys`. Subsequent reboots don't need the seed.
-
-### Summary
-
-| Scenario | Mechanism | Key source |
-|----------|-----------|------------|
-| Poke at the image | `./run_container.sh` | none needed |
-| Build + run VM locally | `build_vm.sh` + `run_vm.sh` | your `~/.ssh/*.pub` (auto) |
-| Distribute pre-built binary | cloud-init NoCloud seed | recipient's own key |
-
-
-
-Checklist/Plan:
----
-# base
-    1. build bootc image (no enhancements)
-        ./01_build_image/
-    2. run bootc image as container
-    3. choose vm software
-    4. build bootc image as iso
-    5. run bootc image as vm
-    6. push to quay
-    7. add to bootc image: pull from quay on reboot (push that update to quay)
-# flash system
-    8. compress + encrypt files, push as backup to GDrive
-    9. build v1.0 image, push to quay
-    10. pull v1.0 image, build as ISO (w/ anaconda)
-    11. flash image to USB, wipe + install to system
-# base image build structure
-    12. build Containerfile (simple git install) (add to image build, test as container + vm)
-    13. build Quadlet (simple ws-env, no integration) (add to image build, test as container + vm)
-# enhance testing
-    14. test GPU passthrough w/ standard vm
-    15. test GPU passthrough w/ bootc image
-    16. test GPU passthrough w/ bootc image + nvidia container
-    17. write as automated CI/CD for image testing
-        (add to image_build + fedora_init, push to quay + github, reboot)
-# system wipe/build/use/backup/recovery
-    18. ws-env: build access to ws-env via ssh
-    19. ws-env: map persistent memory location /etc
-    20. create system btrfs backup on D:/var/
-    21. automate backup: ws-env -> sys-btrfs
-    22. automate recovery: sys-btrfs -> ws-env directory
-    23. automate backup: system btrfs backup compress/encrypt -> cloud
-    24. automate recovery: cloud -> sys-btrfs
-
-
-## open questions / things to finish conceptualizing
--- in the bootc image build, we can provide --fs ext4 (or ideally btrfs). can/should we provide btrfs so that we can use as a true sys admin/root?
-** can we build w/o root?
-** for the initial iso that we flash to a drive and boot to, we SHOULD work out all
-details ahead of time, then use the bare ISO rather than use the gui installer, purely
-for reproducability. If there are other benefits to the anaconda installer, then maybe
-we will keep the anaconda installer. we want to discuss this and work out an intended
-approach.
-** more thoroughly document the process for adding Category1-4 (outlined in "process
-for wiping system post-bootc) + workstation container into the bootc image (probably
-through the containerfile).
-** how to wipe /etc and potentially /var? use a dedicated script? when to do either?
-we want the periodic updates of the bootc image to go through regularly so that we can
-keep the software and kernels and kernel modules up to date. We also want to be able
-to leave the workstation container at the drop of the hat and come back to it without
-fear that our work will be lost. So we should have a set pipeline script to create a
-clean and complete btrfs backup, then to do a full wipe and boot back with the latest
-image and a completely clean system.
-
-## process for wiping system post-bootc
-- on bootc update
-    - /usr is replaced
-    - /etc remains
-    - bootc image needs additional separate pods, quads, containers (workspace container)
-    - on wipe, bootc image loads (like with bootc update)
-        - bootc update would be a separate process from wipe
-        - btrfs send (backup, periodically regardless of wipe)
-            - could keep the backup structure and send structure in place
-            - btrfs would treat these as new blocks
-            - allow us to easily roll back between different wipes
-            - ** could we do compression on btrfs backups between wipes? part of the CI/CD
-    Category 1: write from workstation, wipe on reentry
-        - anything not in specific directories
-        - could still include these in the btrfs backups just in case
-    Category 2: persist workstation container reboots
-        - anything in $HOME/code, $HOME/notes
-        - ** map to /etc or /var?
-    Category 3: persist system wipes
-        - anything in D:/
-        - mainly: btrfs backups (uncompressed, unencrypted)
-            - periodically compress, encrypt, push to cloud
-        - + selective, large content (machine learning models)
-    Category 4: cloud: compressed encrypted backups of Category 3 btrfs backups
-
-
-
-- `/usr/share/containers/systemd/` — replaced wholesale by the new image. Any local edits are gone.
-- `/etc/containers/systemd/` — 3-way merged. Your local edits are preserved unless the new image also changed the same lines, in which case you get a merge conflict to resolve (same as `/etc/ssh/sshd_config`).
-
-
-
-Surface:
-- bootc image:
-    - kernel relevant build (nvidia-akmods, dnf update)
-    - items w/ large/complex setup + minimal runtime surface
-        - ssh configuration, backup process
-        - systemd processes
-        - can still access/modify these by logging into the server itself
-            - updates maintained between reboots as layers in /etc
-            - realtime changes should be worked into the bootc image build for the next build
-- quadlets + pods + containers:
-    - user workstation container (ws-env)
-        - maps specific directories to /etc or /var to persist across reboots
-        - all other files and software installs are transient until baked into ws-env image build
-        - all files, including transient ones, are backed up with btrfs to /D:/var/backup
-    - all will share resources and visibility as needed
-    - ** future: nvidia container for building and running models
-        - ** shared access w/ workstation-container to persistent directories
-        - ** allows workstation-container to function w/ latest and reliable software
-    - ** future: openclaw container: specific and limited access
-    - ** future: containers may include things like ssh, cloudflared, btrfs-backup, etc
-        - ** would allow these to be built and tested separately from core bootc image
-
-
-### Workflow:
-- cron job weekly
-    - rebuilds bootc image w/ latest image, kernels, software
-    - push image to quay
-- manual reboots
-    - pull the latest (by default) available image from quay
-    - boots to that latest image
-        - ** can we integrate automated new images/kernels/software updates without reboot? for minor updates ('dnf update ...'-esk updates) w/o shutting down the server?
-- enhancements
-    - pull latest image from quay
-    - build locally
-    - light test: run as container
-    - full test:
-        - wrap as VM ISO
-        - run in VM
-    - add new content to the image build script + ContainerFile
-
-
-### bootc image breakdown
-    - Containerfile (install, configure), Quadlets (run as service)
-    - quadlet container images
-        - services to run at startup
-        - workstation container, nvidia container
-    - pod quadlets
-        - quadlet services w/ shared resources
-        - system level, store in /etc
-## 1. image Containerfile
-- software installation + configuration
-
-```dockerfile
-FROM quay.io/fedora/fedora-bootc:42
-RUN dnf install -y openssh-server && \
-    systemctl enable sshd
-COPY sshd_config_baseline /etc/ssh/sshd_config.d/99-custom.conf
-```
-
-## 2. podman quadlets (baked into the bootc image)
-- pull/run containers on boot
-- Fedora endorsed
-- process:
-    - image build includes the quadlet (a .container, .pod, .network, .volume file)
-    - quadlet defines what container images to pull/build/run on boot
-    - systemd-generator converts the container + quadlet definition into a systemd unit
-- update container images separately from the bootc image
-- latest container images are pulled and run on reboot
-- sytem-wide quadlet location:
-    - read-only, from your bootc image: `/usr/share/containers/systemd/`
-    - mutable, for runtime additions: '/etc/containers/systemd/`
-
-```quadlet
-# /usr/share/containers/systemd/workstation.container
-[Unit]
-Description=Workstation container
-After=network-online.target
-
-[Container]
-Image=quay.io/m0ranmcharles/fedora_init:dev-container
-AutoUpdate=registry
-Volume=/var/workstation-home:/home/user:Z
-Network=host          # or a named network
-Exec=/usr/bin/sleep infinity
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Future: 3. Podman pods via Quadlets
-- potential for system services (backup CI/CD, logger, ssh)
-- where services need shared resources
-- would allow us to test and deploy components separately from base functional bootc
-  image
-- Best for tightly coupled services that need shared network/IPC namespace
-- think...
-    - service + its sidecar proxy
-    - database + its exporter
-- howto:
-    - define a `.pod` Quadlet +  `.container` Quadlets that reference it
-- benefit:
-    - shared-namespace in pods
-    - processes talk over localhost or share IPC without network overhead
-
-```
-# workstation.pod
-[Pod]
-PodName=workstation
-
-# app.container
-[Container]
-Pod=workstation.pod
-Image=quay.io/m0ranmcharles/fedora_init:dev-container
-
-# proxy.container  
-[Container]
-Pod=workstation.pod
-Image=quay.io/m0ranmcharles/fedora_init:backup-container
-```
-
-
-
-# workflow
-- one time setup
-    - push image to quay
-    - build image as ISO, reboot to image (future pulls from quay)
-- build, deploy
-    - cron to build the latest images with updated kernels etc, push to quay
-    - reboots always pull latest bootc image + quadlet containers
-- enchance
-    - pull image + quadlets from quay
-    - light test as a container
-    - full test: build as ISO, test as VM
-
-
+### How-to
+- [how-to/build_and_run_vm.md](how-to/build_and_run_vm.md) — Procedure for converting the image to qcow2 and booting it with libvirt.
+- [how-to/build_images.md](how-to/build_images.md) — Procedure for building the host image and its associated containers on a local workstation.
+- [how-to/distribute_image.md](how-to/distribute_image.md) — Instructions for a third party to boot the published image with their own SSH key.
+- [how-to/push_to_quay.md](how-to/push_to_quay.md) — Guide for publishing the built images to the Quay registry.
+- [how-to/run_locally.md](how-to/run_locally.md) — Steps to run an ephemeral root shell in the host image without a virtual machine.
+- [how-to/validate_gpu.md](how-to/validate_gpu.md) — End-to-end verification of GPU passthrough from host driver to the dev container.
+- [how-to/write_a_systemd_unit_for_the_host.md](how-to/write_a_systemd_unit_for_the_host.md) — Recipe for adding and enabling new host-level services in the image.
