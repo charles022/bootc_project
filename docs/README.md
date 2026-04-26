@@ -14,10 +14,13 @@
 - **I want to understand why it's built this way**
   - [overview.md](overview.md)
   - [concepts/](concepts/)
+- **I want to add or update docs**
+  - [contributing.md](contributing.md)
 
 ## Full index
 - [overview.md](overview.md) — Project vision, the 3-layer model, and the rationale for a bootc-based GPU workstation.
 - [roadmap.md](roadmap.md) — Current progress, the 24-item project checklist, and open design questions.
+- [contributing.md](contributing.md) — How to find, use, and update these docs; format and structure rules for new contributions.
 
 ### Concepts
 - [concepts/access_model.md](concepts/access_model.md) — The keyless image strategy and the three paths for injecting credentials at deployment.

@@ -64,9 +64,19 @@ The project uses `bootc-image-builder` to convert the bootable container into a 
 ---
 
 ## Key Files
-- `README.md`: Master whitepaper and checklist.
-- `gpu_integration_path.md`: Detailed strategy for NVIDIA/CDI integration.
-- `01_build_image/build_assets/Containerfile`: Primary definition for the bootc host image.
-- `01_build_image/build_assets/dev-container.Containerfile`: Definition for the development environment.
-- `02_build_vm/build_vm.sh` + `02_build_vm/run_vm.sh`: Two-step flow for local VM validation.
-- `process_separation_model.md`: Explanation of when to use host vs. container services.
+
+### Documentation (canonical)
+- `docs/README.md`: Documentation index — start here.
+- `docs/overview.md`: 2-page project pitch and 3-layer model.
+- `docs/contributing.md`: Format, structure, terminology, and update rules for the docs themselves — **read this before adding, editing, or removing a doc**.
+- `docs/concepts/`: Why the project is built this way (`gpu_stack.md`, `ownership_model.md`, `update_pipeline.md`, etc.).
+- `docs/reference/`: Code-paired catalogs of the actual artifacts (Containerfiles, systemd units, Quadlets, scripts). Update these when the corresponding files change.
+- `docs/how-to/`: Procedural recipes (build, push, validate GPU, distribute, etc.).
+
+### Code
+- `01_build_image/build_assets/Containerfile`: Primary definition for the host image.
+- `01_build_image/build_assets/dev-container.Containerfile`: Definition for the dev container.
+- `02_build_vm/build_vm.sh` + `02_build_vm/run_vm.sh`: Local VM validation flow.
+
+### Legacy
+The `.md` files at the repo root (`process_separation_model.md`, `gpu_integration_path.md`, `ostree_notes.md`, etc.) are the original whiteboard the new docs were built from; preserved for archive but superseded by `docs/`.

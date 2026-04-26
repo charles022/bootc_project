@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **bootc (bootable container)** project that replaces a traditional Fedora Server + setup-scripts workflow with an immutable, reproducible host OS plus Podman Quadlet-managed container workloads. The intended deployment target is a GPU workstation; NVIDIA driver/CDI integration is a first-class concern.
 
-Most files in the repo root are long-form design/whitepaper docs (`README.md` is the master checklist, `process_separation_model.md`, `gpu_integration_path.md`, `ostree_notes.md`, etc.). Active build artifacts live under `01_build_image/build_assets/` and `02_build_vm/`.
+User-facing documentation lives under `docs/` — start at `docs/README.md` (index) and `docs/overview.md`. The split into `concepts/`, `reference/`, and `how-to/` is defined in `docs/contributing.md`. The `.md` files in the repo root (`process_separation_model.md`, `gpu_integration_path.md`, `ostree_notes.md`, etc.) are the legacy whiteboard the new docs were built from; preserved for archive but no longer authoritative. Active build artifacts live under `01_build_image/build_assets/` and `02_build_vm/`.
 
 ## Commands
 
@@ -85,6 +85,10 @@ GPU device mappings must come from `nvidia-ctk cdi generate` running on the actu
 
 ### Image registry
 All three images are tagged under `quay.io/m0ranmcharles/fedora_init` with distinct tags (`:latest` for host, `:dev-container`, `:backup-container`). The `devpod.yaml` references the Quay paths directly — a freshly booted VM will pull them on first pod start unless preloaded.
+
+## Editing the docs
+
+The structure, terminology, and update contract for `docs/` is defined in **`docs/contributing.md`** — read it before adding, editing, or removing a doc. The reference layer is intentionally code-paired: when you change a Containerfile, systemd unit, Quadlet, or script, update the matching file under `docs/reference/` in the same commit. The terminology contract (`host image`, `dev pod`, `dev container`, `backup sidecar`, `Quay`) is enforced; honor `(planned)` markers when describing aspirational features.
 
 ## Known caveats when editing
 
