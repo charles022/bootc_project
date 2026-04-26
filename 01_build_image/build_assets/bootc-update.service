@@ -1,0 +1,14 @@
+# Scheduled rebuild + stage of the bootc host image.
+# Activated by bootc-update.timer, not by boot.
+[Unit]
+Description=Rebuild bootc host image in an ephemeral container and stage to OSTree
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RuntimeDirectory=bootc-update
+RuntimeDirectoryMode=0700
+ExecStart=/usr/local/bin/bootc-update.sh
+StandardOutput=journal
+StandardError=journal

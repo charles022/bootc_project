@@ -20,7 +20,15 @@ podman build -t "${REPO}:dev-container" -f "${ASSETS_DIR}/dev-container.Containe
 echo "Building backup-container..."
 podman build -t "${REPO}:backup-container" -f "${ASSETS_DIR}/backup-container.Containerfile" "${ASSETS_DIR}"
 
-# 3. Build the bootc host image
+# 3. Build the os-builder image
+# Ephemeral builder used by the host's scheduled-update pipeline. Carries
+# podman/buildah/git/skopeo so it can clone the repo into RAM, rebuild
+# all four images, and emit the host image as an oci-archive on a tmpfs
+# mount supplied by the host. See 01_build_image/build_assets/os-builder.sh.
+echo "Building os-builder..."
+podman build -t "${REPO}:os-builder" -f "${ASSETS_DIR}/os-builder.Containerfile" "${ASSETS_DIR}"
+
+# 4. Build the bootc host image
 # The OCI image is shareable: no SSH keys, no passwords, no per-user identity
 # is baked in. Credentials are injected at deployment time (qcow2/ISO/install)
 # via bootc-image-builder --config or a cloud-init seed. See ./02_build_vm/.
@@ -31,6 +39,7 @@ echo "=== Build Complete ==="
 echo "Images created:"
 echo "  - ${REPO}:dev-container"
 echo "  - ${REPO}:backup-container"
+echo "  - ${REPO}:os-builder"
 echo "  - ${REPO}:latest (host image, tagged locally as gpu-bootc-host:latest)"
 echo ""
 echo "Next steps:"

@@ -1,0 +1,20 @@
+# Runs once on the first boot of every freshly-staged deployment.
+# Honors push_to_quay= in /etc/bootc-update/reboot.env: if TRUE, pushes
+# the running image to Quay (proving it boots before publishing), then
+# rewrites the flag back to FALSE so the push happens at most once
+# per image build. Always clears the pending marker on success.
+[Unit]
+Description=Conditionally push the freshly-deployed bootc image to Quay
+ConditionFirstBoot=yes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bootc-firstboot-push.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

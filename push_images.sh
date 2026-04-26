@@ -15,7 +15,11 @@ podman push --format v2s2 "${REPO}:backup-container"
 echo "Pushing dev-container..."
 podman push --format v2s2 "${REPO}:dev-container"
 
-# 3. Push the bootc host image
+# 3. Push the os-builder image (ephemeral builder used by scheduled updates)
+echo "Pushing os-builder..."
+podman push --format v2s2 "${REPO}:os-builder"
+
+# 4. Push the bootc host image
 echo "Pushing host image..."
 # Tag the local host image for the remote repository before pushing
 podman tag gpu-bootc-host:latest "${REPO}:latest"
@@ -25,4 +29,5 @@ echo "=== Push Complete ==="
 echo "Images pushed to:"
 echo "  - ${REPO}:backup-container"
 echo "  - ${REPO}:dev-container"
+echo "  - ${REPO}:os-builder"
 echo "  - ${REPO}:latest (Host Image)"

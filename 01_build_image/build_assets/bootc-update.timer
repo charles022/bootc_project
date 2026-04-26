@@ -1,0 +1,12 @@
+# Weekly trigger for bootc-update.service. Persistent=true catches up
+# on a missed window after a long shutdown.
+[Unit]
+Description=Weekly rebuild and stage of the bootc host image
+
+[Timer]
+OnCalendar=Sun 03:00
+Persistent=true
+Unit=bootc-update.service
+
+[Install]
+WantedBy=timers.target

@@ -9,6 +9,7 @@ RUN dnf -y install 'dnf5-command(config-manager)' \
     && dnf -y install \
        openssh-server \
        podman \
+       skopeo \
        nvidia-open \
        nvidia-container-toolkit \
        cloud-init \
@@ -27,6 +28,22 @@ COPY bootc-host-test.service /usr/lib/systemd/system/bootc-host-test.service
 COPY nvidia-cdi-refresh.service /usr/lib/systemd/system/nvidia-cdi-refresh.service
 COPY nvidia-cdi-refresh.path /usr/lib/systemd/system/nvidia-cdi-refresh.path
 
+# Copy the scheduled-update orchestrator and its first-boot push companion.
+# bootc-update.timer fires bootc-update.service on a weekly cadence; the
+# service runs an ephemeral os-builder container that produces a fresh
+# host image and stages it via `bootc switch --transport oci-archive`.
+# bootc-firstboot-push.service runs once on the first boot of every
+# freshly-staged deployment and conditionally publishes the booted image
+# to Quay if /etc/bootc-update/reboot.env requests it.
+COPY bootc-update.service /usr/lib/systemd/system/bootc-update.service
+COPY bootc-update.timer /usr/lib/systemd/system/bootc-update.timer
+COPY bootc-update.sh /usr/local/bin/bootc-update.sh
+COPY bootc-firstboot-push.service /usr/lib/systemd/system/bootc-firstboot-push.service
+COPY bootc-firstboot-push.sh /usr/local/bin/bootc-firstboot-push.sh
+COPY bootc-update-nudge.sh /etc/profile.d/bootc-update-nudge.sh
+RUN chmod 0755 /usr/local/bin/bootc-update.sh /usr/local/bin/bootc-firstboot-push.sh \
+    && chmod 0644 /etc/profile.d/bootc-update-nudge.sh
+
 # Setup Console Autologin for easy VM console access (no network required).
 # This is the fallback path — useful for recovery when SSH isn't reachable.
 # It does not compromise published images because console access requires
@@ -41,6 +58,24 @@ RUN chmod 0755 /opt/project/bootc_host_test.sh
 COPY devpod.kube /usr/share/containers/systemd/devpod.kube
 COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
+# Seed the bootc-update config: source.env in /etc so it survives upgrades
+# with a 3-way merge (operator can repoint to a fork); reboot.env in /etc
+# for the same reason; /var/lib/bootc-update for the staging marker (lives
+# in /var so it persists across the stage-but-not-yet-rebooted window).
+RUN mkdir -p /etc/bootc-update /var/lib/bootc-update \
+    && printf '%s\n' \
+        '# Upstream source the os-builder clones for each scheduled rebuild.' \
+        '# Repoint to a fork by editing this file; survives bootc upgrades.' \
+        'SOURCE_REPO=https://github.com/charles022/bootc_project.git' \
+        'SOURCE_BRANCH=main' \
+        > /etc/bootc-update/source.env \
+    && printf '%s\n' \
+        '# Set push_to_quay=TRUE before rebooting into a freshly-staged image' \
+        '# to publish it to Quay on its first successful boot. The push runs' \
+        '# once and the flag is cleared back to FALSE automatically.' \
+        'push_to_quay=FALSE' \
+        > /etc/bootc-update/reboot.env
+
 # Enable the host-native services that should start on boot.
 # cloud-init.target pulls in the four cloud-init stages so a NoCloud seed
 # (or bootc-image-builder-injected config) is consumed on first boot.
@@ -48,4 +83,6 @@ RUN systemctl enable sshd \
     && systemctl enable cloud-init.target \
     && systemctl enable bootc-host-test.service \
     && systemctl enable nvidia-cdi-refresh.path \
-    && systemctl enable nvidia-cdi-refresh.service
+    && systemctl enable nvidia-cdi-refresh.service \
+    && systemctl enable bootc-update.timer \
+    && systemctl enable bootc-firstboot-push.service

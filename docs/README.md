@@ -3,27 +3,78 @@ This is the whitepaper for our project. The document ostree_notes.md contains so
 
 
 ## goal, purpose
-- current process:
-    - we maintain a set of scripts (fedora_init) to setup our system from scratch. we
-      periodically will save all files as a compressed backup to a separate location,
-      put the latest Fedora Server OS on a USB, then wipe the drive while installing
-      the OS.  We then run the scripts to recreate our system environment, minus any
-      transient files, which we can reference as needed if we need to. this keeps the
-      workspace clean, all software up to date, and removes any software that we have
-      not intentionally saved to our setup scripts. our process is, we will develop on
-      the system, update system configurations and build components, and as they
-      become functional, we save the scripts necessary to recreate them to fedora_init
-      for the next time we wipe and reinstall the system.
-- process we are building:
-    - going forward we will be using bootc images of fedora to manage system component
-      builds, updates, and component development. Broadly, we will be building a bootc
-      image for the core system os, as well as software installation and
-      configuration. We will use podman quadlets and podman pods via quadlets to build
-      the systemd services where we can and where the added complexity is offset by
-      the meaningful benefit of separation from the core bootc image build. The
-      mindset is: setup goes directly into the bootc image Containerfile, while the
-      actions that the system takes after it has been set up are put into quadlets,
-      particulaly those that should be run as systemd services. We will create a
+- high level process:
+    - develop on the system, experiment, build
+        - install software, update configs, build artifacts, etc as needed
+    - functional/stable system components are moved to fedora_init as installation/setup scripts
+    - all software in development is saved on remote git repo
+    - periodically wipe entire system, reinitialize environment using fedora_init
+    - anything created during experimentation/dev and not explicitly saved to fedora_init is wiped
+- purpose:
+    - recreates system environement
+    - removes any transient files from the previous environment
+        - old files can be reference via separate backup as needed
+    - this keeps the workspace clean
+    - removes any software not intentionally saved to fedora_init
+    - all software up to date with minimal dependencies
+- current implementation:
+    - maintain a set of scripts (fedora_init) to setup our system from scratch
+    - to wipe/reinitialize...
+    - save all files as a compressed backup to a separate location
+    - save fedora_init to a separate USB
+        - place minimal init setup of fedora_init on USB
+        - init setup script pulls the rest of fedora_init from remote git repo
+    - flash the latest Fedora OS to a separate USB
+    - install OS on the machine via USB
+    - wipe the drive during installing
+    - run fedora_init to setup environment
+        - USB content does...
+        - authenticates the user
+        - pulls full fedora_init from remote repo
+        - runs full fedora_init on system
+- implementation we are building: bootc image of Fedora + containerized environments and componets
+    - image:
+        - core Fedora bootc image
+        - + software installation/configuration
+        - + systemd services for host boot functions and hardware orchestration
+        - + podman quadlets (.kube, create systemd services) for container orchestration
+        - + pods for container integration
+        - + dev environment container for user environment
+        - + container for backup functionality
+    - scheduled update pipeline: rebuild and deploy the image to the ostree
+        - see *immutable_os_deployment_pipeline.md*
+        - build the image in a ephemeral container
+        - write the image to ram
+        - host system pushes the image from ram to ostree
+        - ostree stores images with delta updates
+            - storage architecture is a content-addressed object store
+            - uses delta updates via file-level hardlinking for saving space
+        - optional: push image to quay
+        - purpose...
+        - image builds are in a container
+            - container building the image will contain everything needed
+            - identical builds across different (original) host OSs
+            - no artifacts left on the host system
+        - interim/experimental updates can go through with dnf or rpm-ostree
+            - see *ostree_architecture.md*
+            - reoccurring image build installs/updates through dnf
+            - potential opportunity for rpm-ostree updates
+                - faster and more efficient image updates
+                - small drift against pre-built images
+                - more technically intricate system config merges w/ user additions to files
+                - may not work with kernel module and driver updates (nvidia, cuda)
+
+
+        
+    
+
+
+
+
+
+
+      setup goes directly into the bootc image Containerfile
+      
       pipeline that runs weekly to rebuild the image (which will pull the latest
       version of all software during the build, including the latest quadlets and
       container images), push the newly built image to quay, then refresh the system
