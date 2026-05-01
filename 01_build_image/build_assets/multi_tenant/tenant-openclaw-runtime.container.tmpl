@@ -1,6 +1,8 @@
 # OpenClaw runtime container for an OpenClaw tenant.
 # More locked down than the dev environment: read-only image filesystem,
-# no host mounts, no privilege escalation.
+# no host mounts, no privilege escalation. The per-tenant provisioner
+# socket is bind-mounted so the agentctl CLI inside the container can
+# self-provision new agent pods (Phase 3, see docs/concepts/agent_provisioning.md).
 [Unit]
 Description=OpenClaw runtime for tenant ${TENANT}
 After=${TENANT}-onboard-pod.service
@@ -10,6 +12,7 @@ BindsTo=${TENANT}-onboard-pod.service
 Image=quay.io/m0ranmcharles/fedora_init:openclaw-runtime
 Pod=${TENANT}-onboard.pod
 Environment=OPENCLAW_TENANT=${TENANT}
+Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
 ReadOnly=true
 NoNewPrivileges=true
 

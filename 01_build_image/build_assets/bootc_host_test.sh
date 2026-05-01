@@ -35,6 +35,11 @@ systemctl is-active openclaw-broker.service || true # broker active state
 ls /var/lib/openclaw-platform/templates/quadlet 2>/dev/null || true # list templates
 [[ -S /run/openclaw-broker/admin.sock ]] && echo "broker admin socket present" || echo "broker admin socket missing" # broker admin socket presence
 python3 -c "import cryptography; print('python3-cryptography:', cryptography.__version__)" 2>/dev/null || echo "python3-cryptography missing" # crypto lib presence
+command -v openclaw-provisioner >/dev/null 2>&1 && echo "openclaw-provisioner present: $(command -v openclaw-provisioner)" || echo "openclaw-provisioner missing" # provisioner presence
+systemctl is-enabled openclaw-provisioner.service || true # provisioner enabled state
+systemctl is-active openclaw-provisioner.service || true # provisioner active state
+[[ -S /run/openclaw-provisioner/admin.sock ]] && echo "provisioner admin socket present" || echo "provisioner admin socket missing" # provisioner admin socket presence
+[[ -d /var/lib/openclaw-platform/templates/agent_quadlet ]] && echo "agent Quadlet templates present" || echo "agent Quadlet templates missing" # agent template dir presence
 
 # Emit a clear completion marker. # host test footer
 echo "=== bootc_host_test.sh completed ===" # completion marker

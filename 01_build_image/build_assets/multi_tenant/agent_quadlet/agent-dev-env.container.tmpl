@@ -1,0 +1,21 @@
+# Dev environment container for agent ${TENANT}/${AGENT}.
+# Mutable inside the container; sudo allowed inside the container only.
+# Tenant volumes are mounted under /workspace/<volume-name>.
+[Unit]
+Description=Dev env ${TENANT}/${AGENT}
+After=${TENANT}-${AGENT}-pod.service
+BindsTo=${TENANT}-${AGENT}-pod.service
+
+[Container]
+Image=${ENV_IMAGE}
+Pod=${TENANT}-${AGENT}.pod
+Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_AGENT=${AGENT}
+${AGENT_VOLUMES_BLOCK}
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

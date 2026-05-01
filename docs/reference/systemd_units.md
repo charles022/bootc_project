@@ -62,6 +62,15 @@ This document catalogs the systemd units authored for this project and the nativ
 - **Enabled at build time?**: Yes (active by default for tty1)
 - **Notes**: Intended for recovery and VM console access; does not affect SSH or network security.
 
+### openclaw-provisioner.service
+- **Path**: `/usr/lib/systemd/system/openclaw-provisioner.service`
+- **Type**: simple long-running daemon
+- **Purpose**: The host agent-provisioning daemon (`concepts/agent_provisioning.md`). Reads per-tenant `policy.yaml`, validates `agent_create` requests, renders agent Quadlets, drives the tenant's user-mode systemd to start the new pod, appends to `/var/lib/openclaw-platform/provisioner/audit.log`.
+- **Triggers**: Starts at boot via `WantedBy=multi-user.target`. `Restart=on-failure` with `RestartSec=5s`. Sets `RuntimeDirectory=openclaw-provisioner` and `StateDirectory=openclaw-platform/provisioner`. `After=openclaw-broker.service` and `Wants=openclaw-broker.service` so the broker is up first for credential cross-checks.
+- **Implements**: `/usr/local/bin/openclaw-provisioner` (Python daemon).
+- **Enabled at build time?**: Yes
+- **Notes**: Admin socket enforces peer-UID 0. Per-tenant sockets are chowned to `tenant_<tenant>` so the rootless `openclaw-runtime` container can mount them.
+
 ### openclaw-broker.service
 - **Path**: `/usr/lib/systemd/system/openclaw-broker.service`
 - **Type**: simple long-running daemon
@@ -108,5 +117,6 @@ On a typical first boot of a new deployment, units activate in this approximate 
 3. **`devpod.service`**: (Generated from Quadlet) Starts the dev pod once Podman and CDI are available.
 4. **`sshd.service`**: Enables remote access.
 5. **`openclaw-broker.service`**: Opens the admin socket and per-tenant sockets so tenant pods' credential-proxy sidecars can reach it.
-6. **`bootc-host-test.service`**: Validates the health of the entire stack.
-7. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.
+6. **`openclaw-provisioner.service`**: Opens its own admin and per-tenant sockets (after the broker) so tenant pods' openclaw-runtime containers can call `agentctl`.
+7. **`bootc-host-test.service`**: Validates the health of the entire stack.
+8. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.

@@ -55,16 +55,16 @@ An ephemeral environment used for automated host image rebuilds.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:os-builder`
 - **Baked-in vs. pulled at runtime**: Pulled and run as an ephemeral container by the host's `bootc-update.service`.
 
-## OpenClaw runtime (Phase-0 stub)
+## OpenClaw runtime
 
-The agent control-loop container in a tenant pod. Phase-0 stub: identifies itself and idles.
+The agent control-loop container in a tenant pod. Phase-3 image ships `agentctl` so the (future) agent loop can self-provision through the host's `openclaw-provisioner.service`. The control-loop process itself is still a placeholder (idle process); a real LLM-driven loop drops in later without changing the host contract.
 
 - **Path**: `01_build_image/build_assets/multi_tenant/openclaw-runtime.Containerfile`
-- **Purpose**: Run an OpenClaw agent inside a tenant pod, locked down (no sudo, read-only filesystem). Phase-0 ships a stub; the real runtime is Phase 3 of the multi-tenant build (`concepts/multi_tenant_architecture.md`).
+- **Purpose**: Host an agent inside a tenant pod, locked down (no sudo, read-only filesystem) but with `agentctl` on `PATH` so the agent can request new agent pods through the per-tenant provisioner socket bind-mounted from the host.
 - **Base image**: `registry.fedoraproject.org/fedora:42`
-- **Key adds**: `bash`, `coreutils`, the `openclaw-runtime-stub.sh` startup script.
+- **Key adds**: `bash`, `coreutils`, `python3`, `agentctl` at `/usr/local/bin/agentctl`, the placeholder `openclaw-runtime-stub.sh` startup script.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:openclaw-runtime`
-- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod. The Quadlet template mounts `/run/openclaw-provisioner/tenants/<tenant>.sock` into `/run/agentctl/agentctl.sock` read-only.
 
 ## Credential proxy
 

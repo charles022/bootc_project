@@ -112,6 +112,22 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Side effects**: Creates and listens on `/run/openclaw-broker/admin.sock` and `/run/openclaw-broker/tenants/<tenant>.sock`. Reads / writes `${OPENCLAW_PLATFORM_ROOT}/broker/{key.bin,store.json,grants.json,audit.log,STATE}`.
 - **Notes**: Single-file Python daemon. Admin operations gated by `SO_PEERCRED` UID 0; agent operations gated by which per-tenant socket the connection arrived on.
 
+### `openclaw-provisioner`
+- **Path**: `/usr/local/bin/openclaw-provisioner` (source: `01_build_image/build_assets/multi_tenant/openclaw-provisioner.py`)
+- **Purpose**: The host agent-provisioning daemon. Reads per-tenant `policy.yaml`, validates `agent_create` requests against allowed images / credentials / networks / volumes / quotas / forbidden flags, cross-checks credentials with the broker, renders agent Quadlets from `/var/lib/openclaw-platform/templates/agent_quadlet/`, runs `daemon-reload` and `systemctl --user --machine=tenant_<tenant>@ start`. See `concepts/agent_provisioning.md`.
+- **Env vars / args**: `OPENCLAW_PLATFORM_ROOT`, `OPENCLAW_AGENT_TEMPLATE_DIR`, `OPENCLAW_QUADLET_DIR`, `OPENCLAW_PROVISIONER_RUNTIME_DIR`, `OPENCLAW_BROKER_ADMIN_SOCK`.
+- **Preconditions**: Run on the host by `openclaw-provisioner.service`. The broker should be running for credential cross-checks; the provisioner falls back to "credential not present" if the broker is unreachable.
+- **Side effects**: Listens on `/run/openclaw-provisioner/admin.sock` and `/run/openclaw-provisioner/tenants/<tenant>.sock`. Reads / writes `${OPENCLAW_PLATFORM_ROOT}/provisioner/{audit.log,STATE}` and `${OPENCLAW_PLATFORM_ROOT}/tenants/<tenant>/agents/<agent>.json`.
+- **Notes**: Single-file Python daemon. Same socket-and-peer-cred design as the broker. The YAML loader is a deliberately small subset (no anchors, no flow style, no multi-doc) — the policy file is host-owned and its schema is fixed.
+
+### `agentctl`
+- **Path**: `/usr/local/bin/agentctl` inside the `openclaw-runtime` container (source: `01_build_image/build_assets/multi_tenant/agentctl.py`).
+- **Purpose**: Tenant-side CLI for self-provisioning. Talks JSONL over the per-tenant provisioner socket bind-mounted at `/run/agentctl/agentctl.sock`.
+- **Env vars / args**: `OPENCLAW_AGENTCTL_SOCKET` (default `/run/agentctl/agentctl.sock`), `OPENCLAW_AGENTCTL_TIMEOUT` (default 10).
+- **Preconditions**: The Quadlet template mounts the per-tenant provisioner socket; the provisioner must be running on the host.
+- **Side effects**: Sends one JSONL request per invocation, prints the parsed reply on stdout. Exit `0` on `ok=true`, `1` otherwise, `3` on socket / connection failure.
+- **Notes**: Subcommands intentionally exclude every host-administration verb — see `reference/agentctl.md`.
+
 ### `credential-proxy`
 - **Path**: `/usr/local/bin/credential-proxy` inside the credential-proxy container (source: `01_build_image/build_assets/multi_tenant/credential-proxy.py`).
 - **Purpose**: Pod-local proxy that forwards in-pod agent requests to the host `openclaw-broker` via a tenant-specific socket bind-mounted from the host. Holds no master credentials.

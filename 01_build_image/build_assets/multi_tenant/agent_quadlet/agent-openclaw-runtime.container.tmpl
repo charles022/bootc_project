@@ -1,0 +1,25 @@
+# OpenClaw runtime container for agent ${TENANT}/${AGENT}.
+# Read-only filesystem, no privilege escalation. Mounts the per-tenant
+# provisioner and broker sockets so the agent's agentctl + credential-proxy
+# clients can reach the host daemons.
+[Unit]
+Description=OpenClaw runtime ${TENANT}/${AGENT}
+After=${TENANT}-${AGENT}-pod.service
+BindsTo=${TENANT}-${AGENT}-pod.service
+
+[Container]
+Image=${RUNTIME_IMAGE}
+Pod=${TENANT}-${AGENT}.pod
+Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_AGENT=${AGENT}
+Environment=OPENCLAW_NETWORK=${NETWORK}
+Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
+ReadOnly=true
+NoNewPrivileges=true
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

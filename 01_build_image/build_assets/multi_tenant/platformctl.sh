@@ -11,6 +11,7 @@ TEMPLATE_DIR="${OPENCLAW_TEMPLATE_DIR:-${PLATFORM_ROOT}/templates/quadlet}"
 SUBID_BASE="${OPENCLAW_SUBID_BASE:-200000}"
 SUBID_BLOCK="${OPENCLAW_SUBID_BLOCK:-65536}"
 BROKER_ADMIN_SOCK="${OPENCLAW_BROKER_ADMIN_SOCK:-/run/openclaw-broker/admin.sock}"
+PROVISIONER_ADMIN_SOCK="${OPENCLAW_PROVISIONER_ADMIN_SOCK:-/run/openclaw-provisioner/admin.sock}"
 DRY_RUN="${OPENCLAW_DRY_RUN:-}"
 
 err() { printf 'platformctl: error: %s\n' "$*" >&2; }
@@ -38,25 +39,23 @@ valid_tenant_name() {
 tenant_user()  { printf 'tenant_%s' "$1"; }
 tenant_dir()   { printf '%s/tenants/%s' "${PLATFORM_ROOT}" "$1"; }
 
-# Send one JSONL request to the broker admin socket and print the JSON reply.
-# Requires `python3` (always present on the host). Returns the broker's exit
-# status: 0 if the reply has ok=true, 1 otherwise.
-broker_call() {
-    local req="$1"
-    local sock="${BROKER_ADMIN_SOCK}"
+# Send one JSONL request to a UNIX socket and print the JSON reply. Returns
+# 0 if ok=true, 1 otherwise. Used for both broker and provisioner.
+sock_call() {
+    local sock="$1" req="$2"
     if [[ ! -S "${sock}" ]]; then
-        err "broker admin socket not present at ${sock} (is openclaw-broker.service running?)"
+        err "socket not present at ${sock}"
         return 3
     fi
     if [[ -n "${DRY_RUN}" ]]; then
-        printf 'DRY-RUN: broker_call %s\n' "${req}"
+        printf 'DRY-RUN: sock_call %s %s\n' "${sock}" "${req}"
         return 0
     fi
     python3 - "${sock}" "${req}" <<'PY'
 import json, socket, sys
 sock_path, req = sys.argv[1], sys.argv[2]
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-s.settimeout(10)
+s.settimeout(15)
 try:
     s.connect(sock_path)
     s.sendall(req.encode("utf-8") + b"\n")
@@ -73,12 +72,20 @@ finally:
 try:
     obj = json.loads(line) if line else {}
 except Exception as exc:
-    print(json.dumps({"ok": False, "error": f"invalid broker reply: {exc}", "raw": line}))
+    print(json.dumps({"ok": False, "error": f"invalid reply: {exc}", "raw": line}))
     sys.exit(1)
 
 print(json.dumps(obj, indent=2, sort_keys=True))
 sys.exit(0 if obj.get("ok") else 1)
 PY
+}
+
+broker_call() {
+    sock_call "${BROKER_ADMIN_SOCK}" "$1"
+}
+
+provisioner_call() {
+    sock_call "${PROVISIONER_ADMIN_SOCK}" "$1"
 }
 
 # Construct a JSON request from KEY=VALUE pairs, treating numbers as numbers.
@@ -163,19 +170,27 @@ Usage:
 
   platformctl audit tail [<n>]
 
-  platformctl agent  list   <tenant>           (planned)
-  platformctl agent  create <tenant> ...       (planned)
+  platformctl agent  create  <tenant> --name <n> --runtime <img> --environment <img> [--credential <id> ...] [--storage <volume> ...] [--ingress <class> ...] [--network <profile>]
+  platformctl agent  list    <tenant>
+  platformctl agent  inspect <tenant> <name>
+  platformctl agent  start   <tenant> <name>
+  platformctl agent  stop    <tenant> <name>
+  platformctl agent  delete  <tenant> <name>
+
+  platformctl policy show <tenant>
+
   platformctl backup run    <tenant>           (planned)
   platformctl backup restore <tenant> --snapshot <id>  (planned)
 
 Environment:
-  OPENCLAW_PLATFORM_ROOT     default: /var/lib/openclaw-platform
-  OPENCLAW_QUADLET_DIR       default: /etc/containers/systemd/users
-  OPENCLAW_TEMPLATE_DIR      default: ${OPENCLAW_PLATFORM_ROOT}/templates/quadlet
-  OPENCLAW_SUBID_BASE        fallback subuid/subgid base (default 200000)
-  OPENCLAW_SUBID_BLOCK       fallback subuid/subgid block size (default 65536)
-  OPENCLAW_BROKER_ADMIN_SOCK default: /run/openclaw-broker/admin.sock
-  OPENCLAW_DRY_RUN           if set, print actions without executing
+  OPENCLAW_PLATFORM_ROOT          default: /var/lib/openclaw-platform
+  OPENCLAW_QUADLET_DIR            default: /etc/containers/systemd/users
+  OPENCLAW_TEMPLATE_DIR           default: ${OPENCLAW_PLATFORM_ROOT}/templates/quadlet
+  OPENCLAW_SUBID_BASE             fallback subuid/subgid base (default 200000)
+  OPENCLAW_SUBID_BLOCK            fallback subuid/subgid block size (default 65536)
+  OPENCLAW_BROKER_ADMIN_SOCK      default: /run/openclaw-broker/admin.sock
+  OPENCLAW_PROVISIONER_ADMIN_SOCK default: /run/openclaw-provisioner/admin.sock
+  OPENCLAW_DRY_RUN                if set, print actions without executing
 EOF
 }
 
@@ -254,14 +269,50 @@ cmd_tenant_create() {
     run chown "${user}:${user}" "$(tenant_dir "${name}")/runtime"
     run chown "${user}:${user}" "$(tenant_dir "${name}")/volumes"
 
-    # Render a placeholder policy file (real policy engine is planned).
+    # Render the default tenant policy. The provisioner reads this file at
+    # every agent_create call (see docs/concepts/agent_provisioning.md). Edit
+    # by hand to relax / tighten what agents may request.
     if [[ -z "${DRY_RUN}" ]]; then
         cat > "$(tenant_dir "${name}")/policy/policy.yaml" <<EOF
-# Placeholder tenant policy for ${name}. The policy engine itself is planned;
-# see docs/concepts/agent_provisioning.md for the schema this will follow.
+# Tenant policy for ${name}. Authoritative source for agent_create validation.
+# See docs/concepts/agent_provisioning.md for the schema.
 tenant: ${name}
 service_user: ${user}
 status: active
+
+limits:
+  max_agents: 10
+  max_running_agents: 5
+
+allowed_images:
+  openclaw_runtime:
+    - quay.io/m0ranmcharles/fedora_init:openclaw-runtime
+  environments:
+    - quay.io/m0ranmcharles/fedora_init:onboarding-env
+
+allowed_credentials:
+  - codex
+  - gemini
+  - claude
+  - email
+  - signal
+  - github
+
+allowed_networks:
+  - none
+  - messaging-only
+  - api-only
+  - restricted-internet
+
+default_network: restricted-internet
+
+forbidden:
+  privileged: true
+  host_network: true
+  host_pid: true
+  host_ipc: true
+  host_podman_socket: true
+  arbitrary_host_mounts: true
 EOF
         chmod 0644 "$(tenant_dir "${name}")/policy/policy.yaml"
     else
@@ -306,9 +357,9 @@ EOF
     # Reload so the user-mode Quadlet generator picks up the new units.
     run systemctl daemon-reload
 
-    # Tell the broker to open a per-tenant socket so the credential-proxy
-    # sidecar in this tenant's pod can mount it. If the broker is not running
-    # (e.g. fresh boot, broker.service still starting), it will pick up the
+    # Tell the broker and the provisioner to open per-tenant sockets so the
+    # credential-proxy and openclaw-runtime sidecars in this tenant's pods can
+    # mount them. If either daemon is not running yet, it will pick up the
     # tenant on its next discover_tenants() at startup; warn but do not fail.
     if [[ -z "${DRY_RUN}" && -n "${tenant_uid}" && "${tenant_uid}" != "<DRY_RUN_UID>" ]]; then
         local req
@@ -317,6 +368,11 @@ EOF
             log "broker not reachable; tenant ${name} will be picked up on broker startup"
         else
             log "broker registered tenant ${name}"
+        fi
+        if ! provisioner_call "${req}" >/dev/null 2>&1; then
+            log "provisioner not reachable; tenant ${name} will be picked up on provisioner startup"
+        else
+            log "provisioner registered tenant ${name}"
         fi
     fi
 
@@ -456,11 +512,12 @@ cmd_tenant_delete() {
     run systemctl --user --machine="${user}@" stop "${name}-onboard-pod.service" || true
     run loginctl disable-linger "${user}" || true
 
-    # Tell the broker to close the per-tenant socket. Best-effort.
+    # Tell the broker and provisioner to close the per-tenant sockets. Best-effort.
     if [[ -z "${DRY_RUN}" ]]; then
         local req
         req=$(mkreq tenant_unregister tenant="${name}")
         broker_call "${req}" >/dev/null 2>&1 || true
+        provisioner_call "${req}" >/dev/null 2>&1 || true
     fi
 
     log "removing rendered Quadlets"
@@ -940,6 +997,116 @@ dispatch_audit() {
     esac
 }
 
+# ---- agent subcommands (Phase 3) ----
+
+cmd_agent_create() {
+    require_root
+    local tenant="${1:-}"; shift || true
+    if [[ -z "${tenant}" ]]; then
+        err "agent create: usage: agent create <tenant> --name <n> --runtime <img> --environment <img> [--credential <id> ...] [--storage <volume> ...] [--ingress <class> ...] [--network <profile>]"
+        exit 1
+    fi
+    if ! getent passwd "$(tenant_user "${tenant}")" >/dev/null; then
+        err "agent create: tenant '${tenant}' does not exist"; exit 2
+    fi
+    local req
+    req=$(python3 - "${tenant}" "$@" <<'PY'
+import json, sys
+tenant = sys.argv[1]
+out = {"op": "agent_create", "tenant": tenant, "credentials": [], "volumes": [], "ingress": []}
+i = 2
+while i < len(sys.argv):
+    flag = sys.argv[i]
+    if flag in ("--name", "--runtime", "--environment", "--network"):
+        if i + 1 >= len(sys.argv):
+            sys.stderr.write(f"missing value for {flag}\n"); sys.exit(1)
+        key = flag[2:]
+        out[key] = sys.argv[i + 1]
+        i += 2
+    elif flag in ("--credential", "--storage", "--ingress"):
+        if i + 1 >= len(sys.argv):
+            sys.stderr.write(f"missing value for {flag}\n"); sys.exit(1)
+        key = "credentials" if flag == "--credential" else ("volumes" if flag == "--storage" else "ingress")
+        out[key].append(sys.argv[i + 1])
+        i += 2
+    else:
+        sys.stderr.write(f"unknown arg {flag}\n"); sys.exit(1)
+print(json.dumps(out))
+PY
+    ) || { err "agent create: invalid arguments"; exit 1; }
+    provisioner_call "${req}"
+}
+
+cmd_agent_list() {
+    local tenant="${1:-}"
+    if [[ -z "${tenant}" ]]; then err "agent list: usage: agent list <tenant>"; exit 1; fi
+    local req; req=$(mkreq agent_list tenant="${tenant}")
+    provisioner_call "${req}"
+}
+
+cmd_agent_inspect() {
+    local tenant="${1:-}" name="${2:-}"
+    if [[ -z "${tenant}" || -z "${name}" ]]; then err "agent inspect: usage: agent inspect <tenant> <name>"; exit 1; fi
+    local req; req=$(mkreq agent_inspect tenant="${tenant}" name="${name}")
+    provisioner_call "${req}"
+}
+
+cmd_agent_stop() {
+    require_root
+    local tenant="${1:-}" name="${2:-}"
+    if [[ -z "${tenant}" || -z "${name}" ]]; then err "agent stop: usage: agent stop <tenant> <name>"; exit 1; fi
+    local req; req=$(mkreq agent_stop tenant="${tenant}" name="${name}")
+    provisioner_call "${req}"
+}
+
+cmd_agent_start() {
+    require_root
+    local tenant="${1:-}" name="${2:-}"
+    if [[ -z "${tenant}" || -z "${name}" ]]; then err "agent start: usage: agent start <tenant> <name>"; exit 1; fi
+    local req; req=$(mkreq agent_start tenant="${tenant}" name="${name}")
+    provisioner_call "${req}"
+}
+
+cmd_agent_delete() {
+    require_root
+    local tenant="${1:-}" name="${2:-}"
+    if [[ -z "${tenant}" || -z "${name}" ]]; then err "agent delete: usage: agent delete <tenant> <name>"; exit 1; fi
+    local req; req=$(mkreq agent_delete tenant="${tenant}" name="${name}")
+    provisioner_call "${req}"
+}
+
+dispatch_agent() {
+    local sub="${1:-}"; shift || true
+    case "${sub}" in
+        create)            cmd_agent_create  "$@" ;;
+        list)              cmd_agent_list    "$@" ;;
+        inspect)           cmd_agent_inspect "$@" ;;
+        stop)              cmd_agent_stop    "$@" ;;
+        start)             cmd_agent_start   "$@" ;;
+        delete)            cmd_agent_delete  "$@" ;;
+        ""|-h|--help|help) usage ;;
+        *) err "unknown agent subcommand '${sub}'"; usage; exit 1 ;;
+    esac
+}
+
+# ---- policy subcommands (Phase 3) ----
+
+cmd_policy_show() {
+    local tenant="${1:-}"
+    if [[ -z "${tenant}" ]]; then err "policy show: usage: policy show <tenant>"; exit 1; fi
+    local req; req=$(mkreq policy_show tenant="${tenant}")
+    provisioner_call "${req}"
+}
+
+dispatch_policy() {
+    local sub="${1:-}"; shift || true
+    case "${sub}" in
+        show)              cmd_policy_show "$@" ;;
+        ""|-h|--help|help) usage ;;
+        *) err "unknown policy subcommand '${sub}'"; usage; exit 1 ;;
+    esac
+}
+
 dispatch_tenant() {
     local sub="${1:-}"; shift || true
     case "${sub}" in
@@ -975,7 +1142,8 @@ main() {
         credential) dispatch_credential "$@" ;;
         grant)      dispatch_grant "$@" ;;
         audit)      dispatch_audit "$@" ;;
-        agent)      cmd_planned "agent $*" ;;
+        agent)      dispatch_agent "$@" ;;
+        policy)     dispatch_policy "$@" ;;
         backup)     cmd_planned "backup $*" ;;
         ""|-h|--help|help) usage ;;
         *) err "unknown command '${cmd}'"; usage; exit 1 ;;

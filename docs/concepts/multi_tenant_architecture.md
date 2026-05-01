@@ -104,28 +104,30 @@ Rules for what may share a pod are in `concepts/tenant_identity_model.md` § "Po
 
 ### What is built today vs. planned
 
-**Built today (Phase 0 + Phase 1 + Phase 2):**
+**Built today (Phase 0 + Phase 1 + Phase 2 + Phase 3):**
 - `platformctl tenant create | list | inspect | disable | enable | delete | verify-isolation` — admin CLI on the host
 - `platformctl tunnel set-config | set-credentials | show | list` — per-tenant cloudflared config / credentials install (root-owned)
-- `platformctl credential add | list | delete | rotate` and `platformctl grant add | remove | list` and `platformctl audit tail` — Phase-2 broker admin CLI (`concepts/credential_broker.md`)
+- `platformctl credential add | list | delete | rotate` + `platformctl grant add | remove | list` + `platformctl audit tail` — Phase-2 broker admin CLI (`concepts/credential_broker.md`)
+- `platformctl agent create | list | inspect | start | stop | delete` + `platformctl policy show` — Phase-3 provisioner admin CLI (`concepts/agent_provisioning.md`)
+- `agentctl` tenant-side CLI inside the openclaw-runtime container with `create-agent | list-agents | inspect-agent | start-agent | stop-agent | delete-agent | policy-show | ping`
 - per-tenant non-login service account with collision-free subuid/subgid allocation
-- per-tenant `/var/lib/openclaw-platform/tenants/<tenant>/` storage layout
-- per-tenant Quadlets rendered into `/etc/containers/systemd/users/<UID>/`
-- onboarding-pod template (cloudflared sidecar + onboarding-env + openclaw-runtime stub + real credential-proxy)
-- real **`openclaw-broker`** daemon with Fernet-encrypted credential store, grant table, append-only audit log, admin socket (UID 0 enforced via `SO_PEERCRED`), and per-tenant sockets chowned to `tenant_<tenant>`
+- per-tenant `/var/lib/openclaw-platform/tenants/<tenant>/` storage layout (now including a real `policy/policy.yaml` and `agents/<agent>.json` records)
+- per-tenant Quadlets rendered into `/etc/containers/systemd/users/<UID>/` for both the onboarding pod and any agent pods
+- onboarding-pod template (cloudflared sidecar + onboarding-env + openclaw-runtime + credential-proxy)
+- real **`openclaw-broker`** daemon with Fernet-encrypted credential store, grant table, append-only audit log, admin socket (UID 0 via `SO_PEERCRED`), and per-tenant sockets chowned to `tenant_<tenant>`
 - real **`credential-proxy`** container that bind-mounts its tenant's broker socket and re-exposes a pod-local agent socket; refuses admin verbs at the pod boundary
-- container image stubs for `openclaw-runtime`, `onboarding-env`
+- real **`openclaw-provisioner`** daemon with per-tenant policy + quota engine, broker-cross-checked credential validation, agent Quadlet rendering, systemd start/stop integration, append-only audit log
+- **`openclaw-runtime`** image now ships `python3` + `agentctl` and bind-mounts the per-tenant provisioner socket for self-provisioning
 - multi-tenant directory layout under `/var/lib/openclaw-platform/`
 
 **Planned:**
-- `agentctl` agent self-provisioning CLI — `reference/agentctl.md`
-- tenant policy / quota engines — `concepts/agent_provisioning.md`
-- messaging bridges (Signal / WhatsApp / email)
-- backup, restore, audit-log retention
+- messaging bridges (Signal / WhatsApp / email) — Phase 4
+- backup, restore, audit-log retention — Phase 5
 - cloudflared route automation via the Cloudflare API (Phase 1 ships *config installation*; *tunnel creation* still requires an external `cloudflared tunnel create` call)
-- interactive `openclaw-onboard` flow inside the onboarding-env container (Phase 4)
-- OAuth / login-URL flow (Phase 4)
-- sealed / HSM-backed broker master key, scheduled credential rotation (Phase 5 hardening)
+- interactive `openclaw-onboard` flow inside the onboarding-env container — Phase 4
+- OAuth / login-URL flow — Phase 4
+- sealed / HSM-backed broker master key, scheduled credential rotation — Phase 5 hardening
+- `agentctl create-env`, `attach-storage` / `detach-storage`, per-agent CPU / memory cgroup enforcement — Phase 4+
 
 The phasing follows the original Multi-Tenant Architecture proposal (§20 of that document). See `roadmap.md` for the live status.
 

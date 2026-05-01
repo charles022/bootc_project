@@ -28,9 +28,14 @@ The admin-side CLI for the multi-tenant layer. Runs on the host as `root` (or vi
 | `platformctl grant add <tenant> <agent> <id> [<scope>]` | built | Authorize a specific agent name to read a specific credential. |
 | `platformctl grant remove <tenant> <agent> <id>` | built | Revoke a single grant. |
 | `platformctl grant list [<tenant>]` | built | List grants for one tenant or all tenants. |
-| `platformctl audit tail [<n>]` | built | Print the last N audit-log entries (default 50). |
-| `platformctl agent list <tenant>` | planned | List agent pods for a tenant. |
-| `platformctl agent create <tenant> ...` | planned | Wraps `agentctl` for admin-driven agent creation. |
+| `platformctl audit tail [<n>]` | built | Print the last N broker audit-log entries (default 50). |
+| `platformctl agent create <tenant> --name X --runtime IMG --environment IMG [--credential ID]... [--storage VOL]... [--ingress CLASS]... [--network PROFILE]` | built | Compose a new agent pod. Same code path as `agentctl create-agent`, but admin-side: identity is an explicit `<tenant>` argument rather than implicit from the per-tenant socket. |
+| `platformctl agent list <tenant>` | built | List the tenant's agents. |
+| `platformctl agent inspect <tenant> <name>` | built | Print one agent's full JSON record. |
+| `platformctl agent start <tenant> <name>` | built | Start a previously stopped agent. |
+| `platformctl agent stop <tenant> <name>` | built | Stop an agent's pod. |
+| `platformctl agent delete <tenant> <name>` | built | Stop, remove Quadlets, drop the record. |
+| `platformctl policy show <tenant>` | built | Print the tenant's policy as parsed JSON. |
 | `platformctl backup run <tenant>` | planned | Snapshot tenant volumes, policy, credential metadata. |
 | `platformctl backup restore <tenant> --snapshot <id>` | planned | Restore from a snapshot. |
 
@@ -98,6 +103,16 @@ printf '%s' 'sk-real-token' | sudo platformctl credential add alice alice/codex/
 
 The full walkthrough is `how-to/enroll_a_credential.md`.
 
+## What `agent` and `policy` do
+
+These subcommands wrap the host's `openclaw-provisioner.service`. They open a UNIX socket connection to `/run/openclaw-provisioner/admin.sock`, send one JSONL request, and print the JSON reply. The provisioner reads the tenant's `policy.yaml`, validates the request against allowed images / credentials / networks / volumes / quotas / forbidden flags, cross-checks credentials with the broker, renders agent Quadlets from `/var/lib/openclaw-platform/templates/agent_quadlet/`, and starts the new pod. Full request/response shapes are in `concepts/agent_provisioning.md`.
+
+`agent create` accepts the same flags as `agentctl create-agent` (`reference/agentctl.md`) — the admin-side path goes through the **admin** socket and takes an explicit `<tenant>` argument; the agent-side path goes through the **per-tenant** socket and infers the tenant from which socket the connection arrived on. They share validation code.
+
+`policy show` reads `/var/lib/openclaw-platform/tenants/<tenant>/policy/policy.yaml` and prints the merged result (defaults underneath). The file itself is the editable source of truth — root edits, no daemon reload required (the provisioner loads the file on every request).
+
+The full walkthrough is `how-to/create_an_agent.md`.
+
 ## What `tunnel` configures
 
 The cloudflared sidecar that ships with each tenant pod uses the upstream `cloudflare/cloudflared` image. It expects a config + credentials in `/etc/cloudflared/` (mounted read-only from `/var/lib/openclaw-platform/tenants/<tenant>/cloudflared/`). `platformctl tunnel set-config` and `platformctl tunnel set-credentials` install those files with root ownership; the tenant cannot rewrite them. There is no automation for actually creating the Cloudflare tunnel itself — that involves a Cloudflare API call and is part of the planned tunnel-automation work in `concepts/multi_tenant_architecture.md` § "Planned".
@@ -118,6 +133,7 @@ sudo systemctl --user --machine=tenant_<tenant>@ restart <tenant>-cloudflared.se
 | `OPENCLAW_SUBID_BASE` | `200000` | Base UID used by the **fallback** subuid/subgid allocator (only triggers when `useradd` did not auto-allocate). |
 | `OPENCLAW_SUBID_BLOCK` | `65536` | Block size for the fallback subuid/subgid allocator. |
 | `OPENCLAW_BROKER_ADMIN_SOCK` | `/run/openclaw-broker/admin.sock` | Path of the broker admin socket. Useful for tests. |
+| `OPENCLAW_PROVISIONER_ADMIN_SOCK` | `/run/openclaw-provisioner/admin.sock` | Path of the provisioner admin socket. Useful for tests. |
 | `OPENCLAW_DRY_RUN` | unset | If set to a non-empty value, print actions without executing. |
 
 ## Exit codes
@@ -149,4 +165,6 @@ sudo systemctl --user --machine=tenant_<tenant>@ restart <tenant>-cloudflared.se
 - `how-to/create_a_tenant.md`
 - `how-to/verify_tenant_isolation.md`
 - `how-to/enroll_a_credential.md`
+- `how-to/create_an_agent.md`
 - `concepts/credential_broker.md`
+- `concepts/agent_provisioning.md`

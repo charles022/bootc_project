@@ -1,0 +1,20 @@
+[Unit]
+Description=OpenClaw agent provisioner
+Documentation=file:///usr/share/doc/openclaw/agent_provisioning.md
+After=local-fs.target openclaw-broker.service
+Wants=openclaw-broker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/openclaw-provisioner
+Restart=on-failure
+RestartSec=5s
+RuntimeDirectory=openclaw-provisioner
+RuntimeDirectoryMode=0755
+StateDirectory=openclaw-platform/provisioner
+StateDirectoryMode=0750
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
