@@ -28,9 +28,13 @@ systemctl status devpod.service --no-pager || true # generated Quadlet service s
 
 # Multi-tenant layer smoke checks. # mta smoke checks
 command -v platformctl >/dev/null 2>&1 && echo "platformctl present: $(command -v platformctl)" || echo "platformctl missing" # platformctl presence
-systemctl is-enabled openclaw-broker.service || true # broker stub enabled state
+command -v openclaw-broker >/dev/null 2>&1 && echo "openclaw-broker present: $(command -v openclaw-broker)" || echo "openclaw-broker missing" # broker presence
+systemctl is-enabled openclaw-broker.service || true # broker enabled state
+systemctl is-active openclaw-broker.service || true # broker active state
 [[ -d /var/lib/openclaw-platform/templates/quadlet ]] && echo "tenant Quadlet templates present" || echo "tenant Quadlet templates missing" # template dir presence
 ls /var/lib/openclaw-platform/templates/quadlet 2>/dev/null || true # list templates
+[[ -S /run/openclaw-broker/admin.sock ]] && echo "broker admin socket present" || echo "broker admin socket missing" # broker admin socket presence
+python3 -c "import cryptography; print('python3-cryptography:', cryptography.__version__)" 2>/dev/null || echo "python3-cryptography missing" # crypto lib presence
 
 # Emit a clear completion marker. # host test footer
 echo "=== bootc_host_test.sh completed ===" # completion marker

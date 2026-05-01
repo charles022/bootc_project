@@ -105,12 +105,20 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Notes**: Full reference at `reference/platformctl.md`. Subcommands `agent`, `credential`, `tunnel`, `backup` are stubs that exit non-zero with a "planned" message.
 
 ### `openclaw-broker`
-- **Path**: `/usr/local/bin/openclaw-broker` (source: `01_build_image/build_assets/multi_tenant/openclaw-broker.sh`)
-- **Purpose**: Stub for the host credential broker. Ensures `/var/lib/openclaw-platform/broker/` exists and writes a state marker. Phase-0 only; the real broker is Phase 2 (`concepts/credential_broker.md`).
-- **Env vars / args**: `OPENCLAW_PLATFORM_ROOT` (default `/var/lib/openclaw-platform`).
-- **Preconditions**: Run on the host by `openclaw-broker.service`.
-- **Side effects**: Creates `${OPENCLAW_PLATFORM_ROOT}/broker/STATE`.
-- **Notes**: Does not issue credentials.
+- **Path**: `/usr/local/bin/openclaw-broker` (source: `01_build_image/build_assets/multi_tenant/openclaw-broker.py`)
+- **Purpose**: The host credential broker daemon. Encrypted credential store, grant table, audit log, admin and per-tenant UNIX sockets. See `concepts/credential_broker.md`.
+- **Env vars / args**: `OPENCLAW_PLATFORM_ROOT` (default `/var/lib/openclaw-platform`), `OPENCLAW_BROKER_RUNTIME_DIR` (default `/run/openclaw-broker`).
+- **Preconditions**: Run on the host by `openclaw-broker.service`. Requires `python3-cryptography`.
+- **Side effects**: Creates and listens on `/run/openclaw-broker/admin.sock` and `/run/openclaw-broker/tenants/<tenant>.sock`. Reads / writes `${OPENCLAW_PLATFORM_ROOT}/broker/{key.bin,store.json,grants.json,audit.log,STATE}`.
+- **Notes**: Single-file Python daemon. Admin operations gated by `SO_PEERCRED` UID 0; agent operations gated by which per-tenant socket the connection arrived on.
+
+### `credential-proxy`
+- **Path**: `/usr/local/bin/credential-proxy` inside the credential-proxy container (source: `01_build_image/build_assets/multi_tenant/credential-proxy.py`).
+- **Purpose**: Pod-local proxy that forwards in-pod agent requests to the host `openclaw-broker` via a tenant-specific socket bind-mounted from the host. Holds no master credentials.
+- **Env vars / args**: `OPENCLAW_TENANT` (required), `OPENCLAW_BROKER_SOCKET` (default `/run/credential-proxy/broker.sock`), `OPENCLAW_AGENT_SOCKET` (default `/run/credential-proxy/agent.sock`).
+- **Preconditions**: The Quadlet template mounts the broker's per-tenant socket into the container; `openclaw-broker.service` must be running on the host.
+- **Side effects**: Listens on `${OPENCLAW_AGENT_SOCKET}`; forwards `credential_request` / `agent_grants` / `ping` upstream and refuses every other op.
+- **Notes**: This is the `CMD` for the `credential-proxy` container image.
 
 ## Container-side
 

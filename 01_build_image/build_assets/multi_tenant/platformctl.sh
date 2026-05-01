@@ -10,6 +10,7 @@ QUADLET_DIR="${OPENCLAW_QUADLET_DIR:-/etc/containers/systemd/users}"
 TEMPLATE_DIR="${OPENCLAW_TEMPLATE_DIR:-${PLATFORM_ROOT}/templates/quadlet}"
 SUBID_BASE="${OPENCLAW_SUBID_BASE:-200000}"
 SUBID_BLOCK="${OPENCLAW_SUBID_BLOCK:-65536}"
+BROKER_ADMIN_SOCK="${OPENCLAW_BROKER_ADMIN_SOCK:-/run/openclaw-broker/admin.sock}"
 DRY_RUN="${OPENCLAW_DRY_RUN:-}"
 
 err() { printf 'platformctl: error: %s\n' "$*" >&2; }
@@ -36,6 +37,84 @@ valid_tenant_name() {
 
 tenant_user()  { printf 'tenant_%s' "$1"; }
 tenant_dir()   { printf '%s/tenants/%s' "${PLATFORM_ROOT}" "$1"; }
+
+# Send one JSONL request to the broker admin socket and print the JSON reply.
+# Requires `python3` (always present on the host). Returns the broker's exit
+# status: 0 if the reply has ok=true, 1 otherwise.
+broker_call() {
+    local req="$1"
+    local sock="${BROKER_ADMIN_SOCK}"
+    if [[ ! -S "${sock}" ]]; then
+        err "broker admin socket not present at ${sock} (is openclaw-broker.service running?)"
+        return 3
+    fi
+    if [[ -n "${DRY_RUN}" ]]; then
+        printf 'DRY-RUN: broker_call %s\n' "${req}"
+        return 0
+    fi
+    python3 - "${sock}" "${req}" <<'PY'
+import json, socket, sys
+sock_path, req = sys.argv[1], sys.argv[2]
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(10)
+try:
+    s.connect(sock_path)
+    s.sendall(req.encode("utf-8") + b"\n")
+    buf = b""
+    while b"\n" not in buf:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+    line = buf.split(b"\n", 1)[0].decode("utf-8", errors="replace")
+finally:
+    s.close()
+
+try:
+    obj = json.loads(line) if line else {}
+except Exception as exc:
+    print(json.dumps({"ok": False, "error": f"invalid broker reply: {exc}", "raw": line}))
+    sys.exit(1)
+
+print(json.dumps(obj, indent=2, sort_keys=True))
+sys.exit(0 if obj.get("ok") else 1)
+PY
+}
+
+# Construct a JSON request from KEY=VALUE pairs, treating numbers as numbers.
+mkreq() {
+    python3 - "$@" <<'PY'
+import json, sys
+out = {"op": sys.argv[1]}
+for kv in sys.argv[2:]:
+    k, _, v = kv.partition("=")
+    if v.lstrip("-").isdigit():
+        out[k] = int(v)
+    else:
+        out[k] = v
+print(json.dumps(out))
+PY
+}
+
+# Same as mkreq but read a single field's value from stdin so secrets never
+# appear on the command line.
+mkreq_with_stdin_value() {
+    local op="$1" value_field="$2"; shift 2
+    python3 - "${op}" "${value_field}" "$@" <<'PY'
+import json, sys
+op = sys.argv[1]
+value_field = sys.argv[2]
+out = {"op": op}
+for kv in sys.argv[3:]:
+    k, _, v = kv.partition("=")
+    if v.lstrip("-").isdigit():
+        out[k] = int(v)
+    else:
+        out[k] = v
+out[value_field] = sys.stdin.read().rstrip("\n")
+print(json.dumps(out))
+PY
+}
 
 # Pick the next free subid range that does not collide with any existing
 # /etc/sub{uid,gid} entry. Used as the fallback when useradd's auto-allocation
@@ -73,20 +152,30 @@ Usage:
   platformctl tunnel show            <tenant>
   platformctl tunnel list
 
-  platformctl agent      list   <tenant>           (planned)
-  platformctl agent      create <tenant> ...       (planned)
-  platformctl credential list   <tenant>           (planned)
-  platformctl credential rotate <tenant> <id>      (planned)
-  platformctl backup     run    <tenant>           (planned)
-  platformctl backup     restore <tenant> --snapshot <id>  (planned)
+  platformctl credential add    <tenant> <id>     (value read from stdin)
+  platformctl credential list   [<tenant>]
+  platformctl credential delete <tenant> <id>
+  platformctl credential rotate <tenant> <id>     (new value read from stdin)
+
+  platformctl grant add    <tenant> <agent> <id> [<scope>]
+  platformctl grant remove <tenant> <agent> <id>
+  platformctl grant list   [<tenant>]
+
+  platformctl audit tail [<n>]
+
+  platformctl agent  list   <tenant>           (planned)
+  platformctl agent  create <tenant> ...       (planned)
+  platformctl backup run    <tenant>           (planned)
+  platformctl backup restore <tenant> --snapshot <id>  (planned)
 
 Environment:
-  OPENCLAW_PLATFORM_ROOT  default: /var/lib/openclaw-platform
-  OPENCLAW_QUADLET_DIR    default: /etc/containers/systemd/users
-  OPENCLAW_TEMPLATE_DIR   default: ${OPENCLAW_PLATFORM_ROOT}/templates/quadlet
-  OPENCLAW_SUBID_BASE     fallback subuid/subgid base (default 200000)
-  OPENCLAW_SUBID_BLOCK    fallback subuid/subgid block size (default 65536)
-  OPENCLAW_DRY_RUN        if set, print actions without executing
+  OPENCLAW_PLATFORM_ROOT     default: /var/lib/openclaw-platform
+  OPENCLAW_QUADLET_DIR       default: /etc/containers/systemd/users
+  OPENCLAW_TEMPLATE_DIR      default: ${OPENCLAW_PLATFORM_ROOT}/templates/quadlet
+  OPENCLAW_SUBID_BASE        fallback subuid/subgid base (default 200000)
+  OPENCLAW_SUBID_BLOCK       fallback subuid/subgid block size (default 65536)
+  OPENCLAW_BROKER_ADMIN_SOCK default: /run/openclaw-broker/admin.sock
+  OPENCLAW_DRY_RUN           if set, print actions without executing
 EOF
 }
 
@@ -216,6 +305,20 @@ EOF
 
     # Reload so the user-mode Quadlet generator picks up the new units.
     run systemctl daemon-reload
+
+    # Tell the broker to open a per-tenant socket so the credential-proxy
+    # sidecar in this tenant's pod can mount it. If the broker is not running
+    # (e.g. fresh boot, broker.service still starting), it will pick up the
+    # tenant on its next discover_tenants() at startup; warn but do not fail.
+    if [[ -z "${DRY_RUN}" && -n "${tenant_uid}" && "${tenant_uid}" != "<DRY_RUN_UID>" ]]; then
+        local req
+        req=$(mkreq tenant_register tenant="${name}" uid="${tenant_uid}" gid="${tenant_gid}")
+        if ! broker_call "${req}" >/dev/null 2>&1; then
+            log "broker not reachable; tenant ${name} will be picked up on broker startup"
+        else
+            log "broker registered tenant ${name}"
+        fi
+    fi
 
     # Start the onboarding pod under the tenant's user manager.
     if [[ -z "${DRY_RUN}" ]]; then
@@ -352,6 +455,13 @@ cmd_tenant_delete() {
     log "stopping ${name}'s services"
     run systemctl --user --machine="${user}@" stop "${name}-onboard-pod.service" || true
     run loginctl disable-linger "${user}" || true
+
+    # Tell the broker to close the per-tenant socket. Best-effort.
+    if [[ -z "${DRY_RUN}" ]]; then
+        local req
+        req=$(mkreq tenant_unregister tenant="${name}")
+        broker_call "${req}" >/dev/null 2>&1 || true
+    fi
 
     log "removing rendered Quadlets"
     run rm -rf "${QUADLET_DIR}/${tenant_uid}"
@@ -688,6 +798,148 @@ cmd_tunnel_list() {
     done <<<"${users}"
 }
 
+# ---- credential subcommands (Phase 2) ----
+
+cmd_credential_add() {
+    require_root
+    local tenant="${1:-}" cred_id="${2:-}"
+    if [[ -z "${tenant}" || -z "${cred_id}" ]]; then
+        err "credential add: usage: credential add <tenant> <id>  (value read from stdin)"
+        exit 1
+    fi
+    if ! getent passwd "$(tenant_user "${tenant}")" >/dev/null; then
+        err "credential add: tenant '${tenant}' does not exist"; exit 2
+    fi
+    if [[ -t 0 ]]; then
+        err "credential add: read value from stdin (e.g. cat secret | platformctl credential add ...)"
+        exit 1
+    fi
+    local req
+    req=$(mkreq_with_stdin_value credential_add value tenant="${tenant}" id="${cred_id}")
+    broker_call "${req}"
+}
+
+cmd_credential_list() {
+    local tenant="${1:-}"
+    local req
+    if [[ -n "${tenant}" ]]; then
+        req=$(mkreq credential_list tenant="${tenant}")
+    else
+        req=$(mkreq credential_list)
+    fi
+    broker_call "${req}"
+}
+
+cmd_credential_delete() {
+    require_root
+    local tenant="${1:-}" cred_id="${2:-}"
+    if [[ -z "${tenant}" || -z "${cred_id}" ]]; then
+        err "credential delete: usage: credential delete <tenant> <id>"
+        exit 1
+    fi
+    local req
+    req=$(mkreq credential_delete tenant="${tenant}" id="${cred_id}")
+    broker_call "${req}"
+}
+
+cmd_credential_rotate() {
+    require_root
+    local tenant="${1:-}" cred_id="${2:-}"
+    if [[ -z "${tenant}" || -z "${cred_id}" ]]; then
+        err "credential rotate: usage: credential rotate <tenant> <id>  (new value read from stdin)"
+        exit 1
+    fi
+    if [[ -t 0 ]]; then
+        err "credential rotate: read new value from stdin"
+        exit 1
+    fi
+    local req
+    req=$(mkreq_with_stdin_value credential_rotate value tenant="${tenant}" id="${cred_id}")
+    broker_call "${req}"
+}
+
+dispatch_credential() {
+    local sub="${1:-}"; shift || true
+    case "${sub}" in
+        add)               cmd_credential_add "$@" ;;
+        list)              cmd_credential_list "$@" ;;
+        delete)            cmd_credential_delete "$@" ;;
+        rotate)            cmd_credential_rotate "$@" ;;
+        ""|-h|--help|help) usage ;;
+        *) err "unknown credential subcommand '${sub}'"; usage; exit 1 ;;
+    esac
+}
+
+# ---- grant subcommands (Phase 2) ----
+
+cmd_grant_add() {
+    require_root
+    local tenant="${1:-}" agent="${2:-}" cred_id="${3:-}" scope="${4:-read}"
+    if [[ -z "${tenant}" || -z "${agent}" || -z "${cred_id}" ]]; then
+        err "grant add: usage: grant add <tenant> <agent> <id> [<scope>]"
+        exit 1
+    fi
+    local req
+    req=$(mkreq grant_add tenant="${tenant}" agent="${agent}" id="${cred_id}" scope="${scope}")
+    broker_call "${req}"
+}
+
+cmd_grant_remove() {
+    require_root
+    local tenant="${1:-}" agent="${2:-}" cred_id="${3:-}"
+    if [[ -z "${tenant}" || -z "${agent}" || -z "${cred_id}" ]]; then
+        err "grant remove: usage: grant remove <tenant> <agent> <id>"
+        exit 1
+    fi
+    local req
+    req=$(mkreq grant_remove tenant="${tenant}" agent="${agent}" id="${cred_id}")
+    broker_call "${req}"
+}
+
+cmd_grant_list() {
+    local tenant="${1:-}"
+    local req
+    if [[ -n "${tenant}" ]]; then
+        req=$(mkreq grant_list tenant="${tenant}")
+    else
+        req=$(mkreq grant_list)
+    fi
+    broker_call "${req}"
+}
+
+dispatch_grant() {
+    local sub="${1:-}"; shift || true
+    case "${sub}" in
+        add)               cmd_grant_add "$@" ;;
+        remove)            cmd_grant_remove "$@" ;;
+        list)              cmd_grant_list "$@" ;;
+        ""|-h|--help|help) usage ;;
+        *) err "unknown grant subcommand '${sub}'"; usage; exit 1 ;;
+    esac
+}
+
+# ---- audit subcommand (Phase 2) ----
+
+cmd_audit_tail() {
+    local n="${1:-50}"
+    if ! [[ "${n}" =~ ^[0-9]+$ ]]; then
+        err "audit tail: argument must be a non-negative integer"
+        exit 1
+    fi
+    local req
+    req=$(mkreq audit_tail n="${n}")
+    broker_call "${req}"
+}
+
+dispatch_audit() {
+    local sub="${1:-}"; shift || true
+    case "${sub}" in
+        tail)              cmd_audit_tail "$@" ;;
+        ""|-h|--help|help) usage ;;
+        *) err "unknown audit subcommand '${sub}'"; usage; exit 1 ;;
+    esac
+}
+
 dispatch_tenant() {
     local sub="${1:-}"; shift || true
     case "${sub}" in
@@ -720,8 +972,10 @@ main() {
     case "${cmd}" in
         tenant)     dispatch_tenant "$@" ;;
         tunnel)     dispatch_tunnel "$@" ;;
+        credential) dispatch_credential "$@" ;;
+        grant)      dispatch_grant "$@" ;;
+        audit)      dispatch_audit "$@" ;;
         agent)      cmd_planned "agent $*" ;;
-        credential) cmd_planned "credential $*" ;;
         backup)     cmd_planned "backup $*" ;;
         ""|-h|--help|help) usage ;;
         *) err "unknown command '${cmd}'"; usage; exit 1 ;;

@@ -15,6 +15,8 @@
   - [concepts/multi_tenant_architecture.md](concepts/multi_tenant_architecture.md)
   - [reference/platformctl.md](reference/platformctl.md)
   - [how-to/create_a_tenant.md](how-to/create_a_tenant.md)
+  - [how-to/verify_tenant_isolation.md](how-to/verify_tenant_isolation.md)
+  - [how-to/enroll_a_credential.md](how-to/enroll_a_credential.md)
 - **I want to understand why it's built this way**
   - [overview.md](overview.md)
   - [concepts/](concepts/)
@@ -30,7 +32,7 @@
 - [concepts/access_model.md](concepts/access_model.md) — The keyless image strategy and the three paths for injecting credentials at deployment.
 - [concepts/agent_provisioning.md](concepts/agent_provisioning.md) — Agent self-provisioning via `agentctl`, policy / quota / grant validation (planned).
 - [concepts/bootc_and_ostree.md](concepts/bootc_and_ostree.md) — How bootc and OSTree provide an immutable, versioned filesystem for the host OS.
-- [concepts/credential_broker.md](concepts/credential_broker.md) — Tenant credential ownership, scoped grants, login-URL flow (planned).
+- [concepts/credential_broker.md](concepts/credential_broker.md) — Tenant credential ownership, encrypted store, scoped grants, audit log, wire protocol.
 - [concepts/gpu_stack.md](concepts/gpu_stack.md) — Architectural split of NVIDIA drivers, toolkit, and CDI across host and container layers.
 - [concepts/multi_tenant_architecture.md](concepts/multi_tenant_architecture.md) — Multi-tenant rootless-Podman platform: per-tenant non-login service accounts, host control plane, OpenClaw agent pods.
 - [concepts/ownership_model.md](concepts/ownership_model.md) — The 3-layer division of responsibility between the host, containers, and Quadlets.
@@ -55,6 +57,7 @@
 - [how-to/build_images.md](how-to/build_images.md) — Procedure for building the host image and its associated containers on a local workstation.
 - [how-to/create_a_tenant.md](how-to/create_a_tenant.md) — Admin walkthrough for `platformctl tenant create`.
 - [how-to/distribute_image.md](how-to/distribute_image.md) — Instructions for a third party to boot the published image with their own SSH key.
+- [how-to/enroll_a_credential.md](how-to/enroll_a_credential.md) — Phase-2 credential enrollment, grants, and verification through the broker.
 - [how-to/verify_tenant_isolation.md](how-to/verify_tenant_isolation.md) — Phase-1 isolation checks via `platformctl tenant verify-isolation`.
 - [how-to/push_to_quay.md](how-to/push_to_quay.md) — Guide for publishing the built images to the Quay registry.
 - [how-to/run_locally.md](how-to/run_locally.md) — Steps to run an ephemeral root shell in the host image without a virtual machine.

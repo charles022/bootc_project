@@ -104,25 +104,28 @@ Rules for what may share a pod are in `concepts/tenant_identity_model.md` § "Po
 
 ### What is built today vs. planned
 
-**Built today (Phase 0 + Phase 1):**
-- `platformctl tenant create | list | inspect | disable | enable | delete` — admin CLI on the host
-- `platformctl tenant verify-isolation [<a> <b>]` — Phase-1 pairwise + per-tenant isolation checks (UIDs distinct, subuid/subgid ranges disjoint, storage roots distinct, cross-tenant filesystem reads denied, Quadlet dirs root-owned and per-UID segregated, account locked / nologin / not in `wheel`)
+**Built today (Phase 0 + Phase 1 + Phase 2):**
+- `platformctl tenant create | list | inspect | disable | enable | delete | verify-isolation` — admin CLI on the host
 - `platformctl tunnel set-config | set-credentials | show | list` — per-tenant cloudflared config / credentials install (root-owned)
+- `platformctl credential add | list | delete | rotate` and `platformctl grant add | remove | list` and `platformctl audit tail` — Phase-2 broker admin CLI (`concepts/credential_broker.md`)
 - per-tenant non-login service account with collision-free subuid/subgid allocation
 - per-tenant `/var/lib/openclaw-platform/tenants/<tenant>/` storage layout
 - per-tenant Quadlets rendered into `/etc/containers/systemd/users/<UID>/`
-- onboarding-pod template (cloudflared sidecar + onboarding-env + openclaw-runtime stub + credential-proxy stub)
-- container image stubs for `openclaw-runtime`, `credential-proxy`, `onboarding-env`
-- `openclaw-broker.service` — host service unit (stub binary)
+- onboarding-pod template (cloudflared sidecar + onboarding-env + openclaw-runtime stub + real credential-proxy)
+- real **`openclaw-broker`** daemon with Fernet-encrypted credential store, grant table, append-only audit log, admin socket (UID 0 enforced via `SO_PEERCRED`), and per-tenant sockets chowned to `tenant_<tenant>`
+- real **`credential-proxy`** container that bind-mounts its tenant's broker socket and re-exposes a pod-local agent socket; refuses admin verbs at the pod boundary
+- container image stubs for `openclaw-runtime`, `onboarding-env`
 - multi-tenant directory layout under `/var/lib/openclaw-platform/`
 
 **Planned:**
-- credential broker logic and scoped grants — `concepts/credential_broker.md`
 - `agentctl` agent self-provisioning CLI — `reference/agentctl.md`
 - tenant policy / quota engines — `concepts/agent_provisioning.md`
 - messaging bridges (Signal / WhatsApp / email)
-- backup, restore, audit log
+- backup, restore, audit-log retention
 - cloudflared route automation via the Cloudflare API (Phase 1 ships *config installation*; *tunnel creation* still requires an external `cloudflared tunnel create` call)
+- interactive `openclaw-onboard` flow inside the onboarding-env container (Phase 4)
+- OAuth / login-URL flow (Phase 4)
+- sealed / HSM-backed broker master key, scheduled credential rotation (Phase 5 hardening)
 
 The phasing follows the original Multi-Tenant Architecture proposal (§20 of that document). See `roadmap.md` for the live status.
 

@@ -90,13 +90,13 @@ The primary collection of artifacts baked into or used to build the project imag
 - `dev_container_test.py`: Validation tests for the dev container environment.
 
 ### `01_build_image/build_assets/multi_tenant/`
-Phase-0 scaffold for the multi-tenant layer (`concepts/multi_tenant_architecture.md`).
+Multi-tenant layer assets (`concepts/multi_tenant_architecture.md`, `concepts/credential_broker.md`).
 - `platformctl.sh`: Admin CLI installed at `/usr/local/bin/platformctl`.
-- `openclaw-broker.sh` + `openclaw-broker.service`: Phase-0 stub for the host credential broker.
+- `openclaw-broker.py` + `openclaw-broker.service`: Phase-2 host credential broker daemon (Fernet-encrypted store, grants, audit, admin + per-tenant sockets).
+- `credential-proxy.py` + `credential-proxy.Containerfile`: Phase-2 pod-local credential proxy sidecar image.
 - `tenant-*.tmpl`: Quadlet templates rendered per-tenant by `platformctl`.
-- `openclaw-runtime.Containerfile` + `openclaw-runtime-stub.sh`: Stub agent runtime image.
-- `credential-proxy.Containerfile` + `credential-proxy-stub.sh`: Stub credential-proxy sidecar image.
-- `onboarding-env.Containerfile` + `onboarding-env-stub.sh`: Stub onboarding env image.
+- `openclaw-runtime.Containerfile` + `openclaw-runtime-stub.sh`: Stub agent runtime image (Phase 0).
+- `onboarding-env.Containerfile` + `onboarding-env-stub.sh`: Stub onboarding env image (Phase 0).
 
 ### `02_build_vm/`
 Tools for local validation of the host image in a virtual machine environment.

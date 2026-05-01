@@ -149,7 +149,7 @@ WantedBy=default.target
 
 ### tenant-credential-proxy.container.tmpl
 
-The pod-local credential proxy. Phase-0 image is a stub; Phase-2 implements the real broker client.
+The pod-local credential proxy. Phase-2 image talks to the host `openclaw-broker` via a tenant-specific socket bind-mounted into the container.
 
 ```ini
 [Unit]
@@ -161,11 +161,17 @@ BindsTo=${TENANT}-onboard-pod.service
 Image=quay.io/m0ranmcharles/fedora_init:credential-proxy
 Pod=${TENANT}-onboard.pod
 Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_BROKER_SOCKET=/run/credential-proxy/broker.sock
+Environment=OPENCLAW_AGENT_SOCKET=/run/credential-proxy/agent.sock
+Volume=/run/openclaw-broker/tenants/${TENANT}.sock:/run/credential-proxy/broker.sock:ro,Z
 ReadOnly=true
+NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target
 ```
+
+The host-side socket file is created and chowned to `tenant_<tenant>:tenant_<tenant>` mode `0600` by `openclaw-broker.service` either at startup (it scans `/var/lib/openclaw-platform/tenants/`) or on demand when `platformctl tenant create` calls `tenant_register` over the broker admin socket.
 
 ## Lifecycle
 

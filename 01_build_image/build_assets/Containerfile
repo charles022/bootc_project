@@ -20,6 +20,8 @@ RUN dnf -y install 'dnf5-command(config-manager)' \
        systemd-container \
        gettext \
        jq \
+       python3 \
+       python3-cryptography \
     && dnf clean all
 
 # Create only the directories we need in the host image.
@@ -67,12 +69,13 @@ COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 # See docs/concepts/multi_tenant_architecture.md for the design.
 # The host ships:
 #   - platformctl admin CLI
-#   - openclaw-broker stub (real broker is Phase 2)
+#   - openclaw-broker daemon (Phase 2 real broker; encrypted credential store,
+#     grants, audit, admin socket, per-tenant sockets)
 #   - per-tenant Quadlet templates rendered by `platformctl tenant create`
 #   - the /var/lib/openclaw-platform tree skeleton (per-tenant subtrees are
 #     created on demand)
 COPY multi_tenant/platformctl.sh /usr/local/bin/platformctl
-COPY multi_tenant/openclaw-broker.sh /usr/local/bin/openclaw-broker
+COPY multi_tenant/openclaw-broker.py /usr/local/bin/openclaw-broker
 COPY multi_tenant/openclaw-broker.service /usr/lib/systemd/system/openclaw-broker.service
 RUN chmod 0755 /usr/local/bin/platformctl /usr/local/bin/openclaw-broker
 

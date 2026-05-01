@@ -21,10 +21,16 @@ The admin-side CLI for the multi-tenant layer. Runs on the host as `root` (or vi
 | `platformctl tunnel set-credentials <tenant> <path>` | built | Install a Cloudflare tunnel credentials JSON. Root-owned, mode 0600. The filename is preserved (`<tunnel-uuid>.json`). |
 | `platformctl tunnel show <tenant>` | built | Print the contents of the tenant's `cloudflared/` directory. |
 | `platformctl tunnel list` | built | List all tenants with their tunnel-config / credentials presence. |
+| `platformctl credential add <tenant> <id>` | built | Read plaintext from stdin, encrypt and store under the tenant's namespace. |
+| `platformctl credential list [<tenant>]` | built | List credentials (no plaintext) for one tenant or all tenants. |
+| `platformctl credential delete <tenant> <id>` | built | Remove a credential from the store; all grants referencing it are dropped. |
+| `platformctl credential rotate <tenant> <id>` | built | Replace a credential's value (read from stdin); preserves grants. |
+| `platformctl grant add <tenant> <agent> <id> [<scope>]` | built | Authorize a specific agent name to read a specific credential. |
+| `platformctl grant remove <tenant> <agent> <id>` | built | Revoke a single grant. |
+| `platformctl grant list [<tenant>]` | built | List grants for one tenant or all tenants. |
+| `platformctl audit tail [<n>]` | built | Print the last N audit-log entries (default 50). |
 | `platformctl agent list <tenant>` | planned | List agent pods for a tenant. |
 | `platformctl agent create <tenant> ...` | planned | Wraps `agentctl` for admin-driven agent creation. |
-| `platformctl credential list <tenant>` | planned | List credentials in the tenant's namespace. |
-| `platformctl credential rotate <tenant> <id>` | planned | Trigger a rotation. |
 | `platformctl backup run <tenant>` | planned | Snapshot tenant volumes, policy, credential metadata. |
 | `platformctl backup restore <tenant> --snapshot <id>` | planned | Restore from a snapshot. |
 
@@ -74,6 +80,24 @@ Phase-1's central deliverable. With no arguments, runs across every tenant on th
 
 The pairwise filesystem check uses `runuser` so it does not rely on the tenants having any login configured.
 
+## What `credential`, `grant`, and `audit` do
+
+These subcommands are thin wrappers over the host's `openclaw-broker` daemon. They open a UNIX socket connection to `/run/openclaw-broker/admin.sock`, send one JSONL request, and print the JSON reply (pretty-printed, sorted keys). The full wire protocol is documented in `concepts/credential_broker.md`.
+
+`credential add` and `credential rotate` read the plaintext **from stdin** so the value never appears on the command line or in shell history. Pipe the value in:
+
+```bash
+printf '%s' 'sk-real-token' | sudo platformctl credential add alice alice/codex/main
+```
+
+`grant add` and `grant remove` operate on the broker's grant table (tenant × agent × credential × scope). The agent name is whatever string the agent will pass in its `credential_request` calls — see `concepts/agent_provisioning.md`.
+
+`credential delete` cascades into the grant table: every grant referencing the deleted credential is removed in the same transaction.
+
+`audit tail` reads `/var/lib/openclaw-platform/broker/audit.log` (append-only JSONL) and returns the last N entries. Each entry includes a UTC timestamp and the operation's identifying fields.
+
+The full walkthrough is `how-to/enroll_a_credential.md`.
+
 ## What `tunnel` configures
 
 The cloudflared sidecar that ships with each tenant pod uses the upstream `cloudflare/cloudflared` image. It expects a config + credentials in `/etc/cloudflared/` (mounted read-only from `/var/lib/openclaw-platform/tenants/<tenant>/cloudflared/`). `platformctl tunnel set-config` and `platformctl tunnel set-credentials` install those files with root ownership; the tenant cannot rewrite them. There is no automation for actually creating the Cloudflare tunnel itself — that involves a Cloudflare API call and is part of the planned tunnel-automation work in `concepts/multi_tenant_architecture.md` § "Planned".
@@ -93,6 +117,7 @@ sudo systemctl --user --machine=tenant_<tenant>@ restart <tenant>-cloudflared.se
 | `OPENCLAW_TEMPLATE_DIR` | `${OPENCLAW_PLATFORM_ROOT}/templates/quadlet` | Source directory for `.tmpl` Quadlet templates. |
 | `OPENCLAW_SUBID_BASE` | `200000` | Base UID used by the **fallback** subuid/subgid allocator (only triggers when `useradd` did not auto-allocate). |
 | `OPENCLAW_SUBID_BLOCK` | `65536` | Block size for the fallback subuid/subgid allocator. |
+| `OPENCLAW_BROKER_ADMIN_SOCK` | `/run/openclaw-broker/admin.sock` | Path of the broker admin socket. Useful for tests. |
 | `OPENCLAW_DRY_RUN` | unset | If set to a non-empty value, print actions without executing. |
 
 ## Exit codes
@@ -102,8 +127,9 @@ sudo systemctl --user --machine=tenant_<tenant>@ restart <tenant>-cloudflared.se
 | `0` | success |
 | `1` | usage error (bad arguments, unknown subcommand) |
 | `2` | precondition failed (tenant already exists, missing template) |
-| `3` | host action failed (useradd, systemctl, mkdir, etc.) |
+| `3` | host action failed (useradd, systemctl, mkdir, etc.; broker socket missing) |
 | `4` | `tenant verify-isolation` found at least one violation |
+| non-zero (1) | a broker call returned `{"ok": false, ...}`; the JSON reply is still printed |
 
 ## Notes
 
@@ -122,3 +148,5 @@ sudo systemctl --user --machine=tenant_<tenant>@ restart <tenant>-cloudflared.se
 - `reference/agentctl.md`
 - `how-to/create_a_tenant.md`
 - `how-to/verify_tenant_isolation.md`
+- `how-to/enroll_a_credential.md`
+- `concepts/credential_broker.md`
