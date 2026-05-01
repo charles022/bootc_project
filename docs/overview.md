@@ -35,7 +35,7 @@ The system splits responsibility across three distinct layers:
 - Image push to Quay.
 - GPU CDI plumbing and dynamic boot-time generation.
 - Scheduled local rebuild pipeline (`bootc-update.timer`, `os-builder`, and first-boot push).
-- Multi-tenant Phase 0 scaffold: `platformctl tenant create | list | disable | enable | delete`, per-tenant non-login service accounts, per-tenant Quadlet rendering, `openclaw-broker.service` stub, Phase-0 stubs for `openclaw-runtime` / `credential-proxy` / `onboarding-env`. See `concepts/multi_tenant_architecture.md`.
+- Multi-tenant Phase 0 + Phase 1: `platformctl tenant create | list | inspect | disable | enable | delete | verify-isolation`, `platformctl tunnel set-config | set-credentials | show | list`, collision-free fallback subuid/subgid allocator, per-tenant non-login service accounts, per-tenant Quadlet rendering, `openclaw-broker.service` stub, Phase-0 stubs for `openclaw-runtime` / `credential-proxy` / `onboarding-env`. See `concepts/multi_tenant_architecture.md`.
 
 **Planned:**
 - Remote/CI rebuild orchestration (planned).

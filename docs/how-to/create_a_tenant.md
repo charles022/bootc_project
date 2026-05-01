@@ -90,6 +90,12 @@ sudo -u tenant_alice ls /var/lib/openclaw-platform/tenants/bob/runtime 2>&1 | he
 # expect: permission denied (when tenant bob exists)
 ```
 
+For the full Phase-1 isolation check, see `how-to/verify_tenant_isolation.md`:
+
+```bash
+sudo platformctl tenant verify-isolation
+```
+
 ## Troubleshooting
 
 - **`platformctl: command not found`** — the host image is older than the multi-tenant layer. Update via `bootc update` and reboot.
@@ -105,3 +111,4 @@ sudo -u tenant_alice ls /var/lib/openclaw-platform/tenants/bob/runtime 2>&1 | he
 - `concepts/multi_tenant_architecture.md`
 - `concepts/tenant_identity_model.md`
 - `concepts/tenant_storage_layout.md`
+- `how-to/verify_tenant_isolation.md`

@@ -12,6 +12,7 @@
 - boot-time host smoke test (`bootc-host-test.service`)
 - boot-time dev container smoke test (`dev_container_test.py`)
 - multi-tenant Phase 0 scaffold: `platformctl` admin CLI, per-tenant non-login service account creation, per-tenant Quadlet rendering under `/etc/containers/systemd/users/<UID>/`, tenant storage layout under `/var/lib/openclaw-platform/tenants/<tenant>/`, `openclaw-broker.service` stub, Phase-0 stub container images (`openclaw-runtime`, `credential-proxy`, `onboarding-env`)
+- multi-tenant Phase 1 isolation: `platformctl tenant inspect`, `platformctl tenant verify-isolation` (pairwise + per-tenant), `platformctl tunnel set-config | set-credentials | show | list`, collision-free fallback subuid/subgid allocator, `how-to/verify_tenant_isolation.md` walkthrough
 
 ## Planned
 
@@ -55,7 +56,7 @@
 
 ### multi-tenant
 26. Phase 0 — minimal proof of concept (done): `platformctl tenant create` produces a non-login service account, allocates subuid/subgid, lays out `/var/lib/openclaw-platform/tenants/<tenant>/`, renders the onboarding-pod Quadlets, enables lingering, and starts the pod under the tenant's user manager. Cloudflared sidecar restart-loops until a real tunnel token is provisioned. Phase-0 stubs ship for the `openclaw-runtime`, `credential-proxy`, and `onboarding-env` container images.
-27. Phase 1 — proper tenant isolation (planned): cross-tenant access tests, validated separation of Podman stores, separate cloudflared routes, audit baseline.
+27. Phase 1 — proper tenant isolation (done): collision-free fallback subuid/subgid allocator (replaces the Phase-0 hardcoded range bug); `platformctl tenant inspect` and `platformctl tenant verify-isolation` for per-tenant invariants and pairwise checks (distinct UIDs, disjoint subuid/subgid ranges, distinct storage roots, cross-tenant filesystem-read denial, root-owned per-UID Quadlet dirs); `platformctl tunnel set-config | set-credentials | show | list` for separate cloudflared routes per tenant; `how-to/verify_tenant_isolation.md` walkthrough.
 28. Phase 2 — credential broker (planned): real broker daemon, encrypted credential store, scoped grants, credential-proxy implementation, login-URL onboarding flow. See `docs/concepts/credential_broker.md`.
 29. Phase 3 — agent provisioning (planned): `agentctl` CLI/API, policy engine, quota engine, template-driven Quadlet generation for arbitrary agent pods. See `docs/concepts/agent_provisioning.md`.
 30. Phase 4 — messaging-first interface (planned): Signal/WhatsApp/email bridges, message-driven agent creation.

@@ -55,6 +55,7 @@
 - [how-to/build_images.md](how-to/build_images.md) — Procedure for building the host image and its associated containers on a local workstation.
 - [how-to/create_a_tenant.md](how-to/create_a_tenant.md) — Admin walkthrough for `platformctl tenant create`.
 - [how-to/distribute_image.md](how-to/distribute_image.md) — Instructions for a third party to boot the published image with their own SSH key.
+- [how-to/verify_tenant_isolation.md](how-to/verify_tenant_isolation.md) — Phase-1 isolation checks via `platformctl tenant verify-isolation`.
 - [how-to/push_to_quay.md](how-to/push_to_quay.md) — Guide for publishing the built images to the Quay registry.
 - [how-to/run_locally.md](how-to/run_locally.md) — Steps to run an ephemeral root shell in the host image without a virtual machine.
 - [how-to/staged_validation.md](how-to/staged_validation.md) — Three-stage process for validating the dev pod by peeling back manual steps as automation is verified.

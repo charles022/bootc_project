@@ -104,9 +104,11 @@ Rules for what may share a pod are in `concepts/tenant_identity_model.md` § "Po
 
 ### What is built today vs. planned
 
-**Built today (Phase 0 scaffold):**
-- `platformctl tenant create | list | disable | delete` — admin CLI on the host
-- per-tenant non-login service account with subuid/subgid allocation
+**Built today (Phase 0 + Phase 1):**
+- `platformctl tenant create | list | inspect | disable | enable | delete` — admin CLI on the host
+- `platformctl tenant verify-isolation [<a> <b>]` — Phase-1 pairwise + per-tenant isolation checks (UIDs distinct, subuid/subgid ranges disjoint, storage roots distinct, cross-tenant filesystem reads denied, Quadlet dirs root-owned and per-UID segregated, account locked / nologin / not in `wheel`)
+- `platformctl tunnel set-config | set-credentials | show | list` — per-tenant cloudflared config / credentials install (root-owned)
+- per-tenant non-login service account with collision-free subuid/subgid allocation
 - per-tenant `/var/lib/openclaw-platform/tenants/<tenant>/` storage layout
 - per-tenant Quadlets rendered into `/etc/containers/systemd/users/<UID>/`
 - onboarding-pod template (cloudflared sidecar + onboarding-env + openclaw-runtime stub + credential-proxy stub)
@@ -120,7 +122,7 @@ Rules for what may share a pod are in `concepts/tenant_identity_model.md` § "Po
 - tenant policy / quota engines — `concepts/agent_provisioning.md`
 - messaging bridges (Signal / WhatsApp / email)
 - backup, restore, audit log
-- cloudflared route automation and Cloudflare API integration
+- cloudflared route automation via the Cloudflare API (Phase 1 ships *config installation*; *tunnel creation* still requires an external `cloudflared tunnel create` call)
 
 The phasing follows the original Multi-Tenant Architecture proposal (§20 of that document). See `roadmap.md` for the live status.
 

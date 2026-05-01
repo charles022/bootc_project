@@ -68,9 +68,17 @@ A Podman pod shares network and IPC namespaces between its containers. Therefore
 
 ### subuid / subgid allocation
 
-`useradd` on Fedora normally allocates subuid/subgid automatically (see `/etc/login.defs`'s `SUB_UID_*` settings). `platformctl tenant create` relies on this default and verifies the range is present after user creation; if not, it falls back to an explicit `usermod -v <range> -w <range>` call.
+`useradd` on Fedora normally allocates subuid/subgid automatically (see `/etc/login.defs`'s `SUB_UID_*` settings). `platformctl tenant create` relies on this default and verifies the range is present after user creation. If `useradd` did **not** auto-allocate (some distros / configurations disable it), `platformctl` falls back to a small allocator that:
+
+1. reads `/etc/subuid` (or `/etc/subgid`),
+2. finds the highest end-of-range across all existing entries,
+3. allocates a new 65536-ID block starting just past that highest end (clamped to a configurable base, default `200000`).
+
+This guarantees the new block does **not** overlap any existing entry — so two tenants created back-to-back never collide, even when the kernel-level auto-allocation is disabled. (Phase 0 used a hardcoded fallback range, which would cause collisions for any second tenant going through the fallback path; Phase 1 fixed this. See `roadmap.md`.)
 
 Each tenant gets a contiguous block (typically 65536 IDs) so container-internal UIDs 0..65535 all map into that block. That block does not overlap any other tenant's, so a path owned by container-UID 0 in `tenant_alice` cannot be read by `tenant_bob`'s containers.
+
+Operators can verify all tenants pairwise at any time with `sudo platformctl tenant verify-isolation` — it walks `/etc/subuid` and `/etc/subgid` and flags any overlap, in addition to the cross-tenant filesystem-read tests. See `how-to/verify_tenant_isolation.md`.
 
 ### Recovery
 
@@ -96,3 +104,4 @@ These follow from the rules in `concepts/multi_tenant_architecture.md` and are e
 - `reference/platformctl.md`
 - `reference/tenant_quadlets.md`
 - `how-to/create_a_tenant.md`
+- `how-to/verify_tenant_isolation.md`
