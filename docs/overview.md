@@ -35,12 +35,14 @@ The system splits responsibility across three distinct layers:
 - Image push to Quay.
 - GPU CDI plumbing and dynamic boot-time generation.
 - Scheduled local rebuild pipeline (`bootc-update.timer`, `os-builder`, and first-boot push).
+- Multi-tenant Phase 0 scaffold: `platformctl tenant create | list | disable | enable | delete`, per-tenant non-login service accounts, per-tenant Quadlet rendering, `openclaw-broker.service` stub, Phase-0 stubs for `openclaw-runtime` / `credential-proxy` / `onboarding-env`. See `concepts/multi_tenant_architecture.md`.
 
 **Planned:**
 - Remote/CI rebuild orchestration (planned).
 - Btrfs-based state persistence (planned).
 - Real backup logic (planned).
 - System wipe-and-restore pipeline (planned).
+- Multi-tenant credential broker, `agentctl` agent self-provisioning, policy/quota engines, messaging bridges, tunnel automation (planned). See `concepts/credential_broker.md` and `concepts/agent_provisioning.md`.
 
 See `roadmap.md` for a complete list of upcoming work and open questions.
 
@@ -51,3 +53,5 @@ If you are thinking "I want to use the published image", refer to `how-to/distri
 If you are thinking "I want to build and test locally", begin with `how-to/build_images.md` to compile the artifacts, test them with `how-to/build_and_run_vm.md`, and verify hardware integration through `how-to/validate_gpu.md`.
 
 If you are thinking "I want to understand why it's built this way", explore the `concepts/` directory to read the structural rationale behind these choices.
+
+If you are thinking "I want to host more than one user/agent on this box", read `concepts/multi_tenant_architecture.md` for the design and `how-to/create_a_tenant.md` for the procedure. The multi-tenant layer is additive: it sits on top of the existing 3-layer model and reuses the same host image, Quadlet, and ownership rules.

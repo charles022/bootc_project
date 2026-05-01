@@ -55,6 +55,47 @@ An ephemeral environment used for automated host image rebuilds.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:os-builder`
 - **Baked-in vs. pulled at runtime**: Pulled and run as an ephemeral container by the host's `bootc-update.service`.
 
+## OpenClaw runtime (Phase-0 stub)
+
+The agent control-loop container in a tenant pod. Phase-0 stub: identifies itself and idles.
+
+- **Path**: `01_build_image/build_assets/multi_tenant/openclaw-runtime.Containerfile`
+- **Purpose**: Run an OpenClaw agent inside a tenant pod, locked down (no sudo, read-only filesystem). Phase-0 ships a stub; the real runtime is Phase 3 of the multi-tenant build (`concepts/multi_tenant_architecture.md`).
+- **Base image**: `registry.fedoraproject.org/fedora:42`
+- **Key adds**: `bash`, `coreutils`, the `openclaw-runtime-stub.sh` startup script.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:openclaw-runtime`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+
+## Credential proxy (Phase-0 stub)
+
+The pod-local credential proxy sidecar. Phase-0 stub: identifies itself and idles.
+
+- **Path**: `01_build_image/build_assets/multi_tenant/credential-proxy.Containerfile`
+- **Purpose**: Provide a pod-local UNIX-socket interface that talks to the host `openclaw-broker`. Phase-0 ships a stub; the real proxy is Phase 2 (`concepts/credential_broker.md`).
+- **Base image**: `registry.fedoraproject.org/fedora:42`
+- **Key adds**: `bash`, `coreutils`, the `credential-proxy-stub.sh` startup script.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:credential-proxy`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+
+## Onboarding env (Phase-0 stub)
+
+The shell container the tenant SSHes into during initial enrollment. Phase-0 stub: idle, sshd installed but not started.
+
+- **Path**: `01_build_image/build_assets/multi_tenant/onboarding-env.Containerfile`
+- **Purpose**: Host the credential-enrollment flow that runs on first contact with a new tenant. Phase-0 ships a stub.
+- **Base image**: `registry.fedoraproject.org/fedora:42`
+- **Key adds**: `bash`, `coreutils`, `openssh-server`, `sudo`, the `onboarding-env-stub.sh` startup script.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:onboarding-env`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+
+## Cloudflared sidecar (upstream image)
+
+The Cloudflare Tunnel daemon that publishes tenant ingress routes.
+
+- **Path**: not built locally; referenced by tenant Quadlet templates.
+- **Image**: `docker.io/cloudflare/cloudflared:latest`
+- **Notes**: Configuration / tunnel token is mounted read-only from `/var/lib/openclaw-platform/tenants/<tenant>/cloudflared/`. The container runs only as a tenant-pod sidecar; tunnel automation is planned (`concepts/multi_tenant_architecture.md`).
+
 ## Common properties
 
 ### Build context

@@ -72,6 +72,10 @@ Hard constraints. PR review will flag violations.
   - **host image** (NOT "bootc image" or "OS image")
   - **dev pod**, **dev container**, **backup sidecar**
   - **Quay** for the registry by name; "the registry" only when generic
+  - **tenant** (a platform identity backed by a non-login service account; never "user" in the multi-tenant context)
+  - **tenant service account** (e.g. `tenant_alice`); never "tenant user" or "guest user"
+  - **OpenClaw runtime**, **dev environment**, **cloudflared sidecar**, **credential proxy** for the tenant pod's containers
+  - **`platformctl`** (admin CLI), **`agentctl`** (agent CLI, planned), **`openclaw-broker`** (host service)
 - **No essays.** State the decision, name the alternative in one sentence, give one paragraph of rationale.
 - **Code excerpts are illustrative.** Always give a path and a "see the file in the repo for the authoritative version" pointer. Don't reproduce whole files.
 

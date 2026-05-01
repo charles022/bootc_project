@@ -1,0 +1,21 @@
+# OpenClaw runtime container for an OpenClaw tenant.
+# More locked down than the dev environment: read-only image filesystem,
+# no host mounts, no privilege escalation.
+[Unit]
+Description=OpenClaw runtime for tenant ${TENANT}
+After=${TENANT}-onboard-pod.service
+BindsTo=${TENANT}-onboard-pod.service
+
+[Container]
+Image=quay.io/m0ranmcharles/fedora_init:openclaw-runtime
+Pod=${TENANT}-onboard.pod
+Environment=OPENCLAW_TENANT=${TENANT}
+ReadOnly=true
+NoNewPrivileges=true
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

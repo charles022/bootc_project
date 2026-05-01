@@ -62,6 +62,15 @@ This document catalogs the systemd units authored for this project and the nativ
 - **Enabled at build time?**: Yes (active by default for tty1)
 - **Notes**: Intended for recovery and VM console access; does not affect SSH or network security.
 
+### openclaw-broker.service
+- **Path**: `/usr/lib/systemd/system/openclaw-broker.service`
+- **Type**: oneshot service (`RemainAfterExit=yes`)
+- **Purpose**: Phase-0 stub for the host credential broker. Ensures `/var/lib/openclaw-platform/broker/` exists and writes a state marker so other components can depend on the broker being "present" in the systemd graph.
+- **Triggers**: Starts at boot via `WantedBy=multi-user.target`.
+- **Implements**: `/usr/local/bin/openclaw-broker`.
+- **Enabled at build time?**: Yes
+- **Notes**: Issues no credentials. Real broker logic is Phase 2 of the multi-tenant build (`concepts/credential_broker.md`).
+
 ## Native host services
 
 These services are part of the base Fedora Bootc image or installed via `dnf` and are explicitly enabled during the build.
@@ -78,6 +87,18 @@ These services are part of the base Fedora Bootc image or installed via `dnf` an
 
 Quadlet files located in `/usr/share/containers/systemd/` are processed by `systemd-quadlet-generator` at boot time. This project includes `devpod.kube`, which results in a `devpod.service` unit. See `reference/quadlets.md` for the field-by-field breakdown and `concepts/ownership_model.md` for the role Quadlet plays in the architecture.
 
+### Per-tenant Quadlet-generated user units
+
+When `platformctl tenant create <tenant>` runs, it renders Quadlet templates into `/etc/containers/systemd/users/<UID>/`. Podman's user-mode generator processes them under the tenant's user manager and produces:
+
+- `<tenant>-onboard-pod.service` (from `<tenant>-onboard.pod`)
+- `<tenant>-cloudflared.service` (from `<tenant>-cloudflared.container`)
+- `<tenant>-onboard-env.service` (from `<tenant>-onboard-env.container`)
+- `<tenant>-openclaw-runtime.service` (from `<tenant>-openclaw-runtime.container`)
+- `<tenant>-credential-proxy.service` (from `<tenant>-credential-proxy.container`)
+
+These run **as the tenant service account**, not as root. Inspect them with `systemctl --user --machine=tenant_<tenant>@ list-units`. See `reference/tenant_quadlets.md`.
+
 ## Boot order
 
 On a typical first boot of a new deployment, units activate in this approximate sequence:
@@ -86,5 +107,6 @@ On a typical first boot of a new deployment, units activate in this approximate 
 2. **`nvidia-cdi-refresh.service`**: Generates the CDI spec once drivers and device nodes are ready.
 3. **`devpod.service`**: (Generated from Quadlet) Starts the dev pod once Podman and CDI are available.
 4. **`sshd.service`**: Enables remote access.
-5. **`bootc-host-test.service`**: Validates the health of the entire stack.
-6. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.
+5. **`openclaw-broker.service`**: Establishes the broker state directory (Phase-0 stub).
+6. **`bootc-host-test.service`**: Validates the health of the entire stack.
+7. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.

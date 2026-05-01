@@ -96,6 +96,22 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Side effects**: Clones the repository and writes `.tar` image archives to the output directory.
 - **Notes**: This script is the `ENTRYPOINT` for the `os-builder` image.
 
+### `platformctl`
+- **Path**: `/usr/local/bin/platformctl` (source: `01_build_image/build_assets/multi_tenant/platformctl.sh`)
+- **Purpose**: Admin CLI for the multi-tenant layer. Manages tenant lifecycle (create, list, disable, enable, delete) and renders Quadlet templates per tenant.
+- **Env vars / args**: `OPENCLAW_PLATFORM_ROOT`, `OPENCLAW_QUADLET_DIR`, `OPENCLAW_TEMPLATE_DIR`, `OPENCLAW_DRY_RUN`.
+- **Preconditions**: Run as `root` on the host. Templates must exist at `${OPENCLAW_TEMPLATE_DIR}`.
+- **Side effects**: Creates / removes a non-login service account, allocates subuid/subgid, builds the tenant storage subtree under `/var/lib/openclaw-platform/tenants/<tenant>/`, renders Quadlets into `/etc/containers/systemd/users/<UID>/`, enables lingering, reloads systemd, starts the tenant onboarding pod under the tenant's user manager.
+- **Notes**: Full reference at `reference/platformctl.md`. Subcommands `agent`, `credential`, `tunnel`, `backup` are stubs that exit non-zero with a "planned" message.
+
+### `openclaw-broker`
+- **Path**: `/usr/local/bin/openclaw-broker` (source: `01_build_image/build_assets/multi_tenant/openclaw-broker.sh`)
+- **Purpose**: Stub for the host credential broker. Ensures `/var/lib/openclaw-platform/broker/` exists and writes a state marker. Phase-0 only; the real broker is Phase 2 (`concepts/credential_broker.md`).
+- **Env vars / args**: `OPENCLAW_PLATFORM_ROOT` (default `/var/lib/openclaw-platform`).
+- **Preconditions**: Run on the host by `openclaw-broker.service`.
+- **Side effects**: Creates `${OPENCLAW_PLATFORM_ROOT}/broker/STATE`.
+- **Notes**: Does not issue credentials.
+
 ## Container-side
 
 ### `dev_container_start.sh`

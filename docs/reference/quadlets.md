@@ -6,9 +6,10 @@ Quadlets are the mechanism for bridging systemd and Podman in this project. They
 
 Quadlet files in this project are baked into the **host image** during the build process.
 
-* **System-wide (Standard):** Files are installed at `/usr/share/containers/systemd/`. This directory is for immutable units provided by the image.
+* **System-wide (Standard):** Files are installed at `/usr/share/containers/systemd/`. This directory is for immutable units provided by the image. The system dev pod (`devpod.kube`) lives here.
 * **Mutable/Local:** Files placed at `/etc/containers/systemd/` are mutable but subject to three-way merges during bootc updates.
-* **User-scoped:** Quadlets can also live in `~/.config/containers/systemd/` for services that should run under a specific user session (not used in the current host image).
+* **User-scoped:** Quadlets can also live in `~/.config/containers/systemd/` for services that should run under a specific user session (not used by the system dev pod).
+* **Per-UID admin-managed:** Files placed under `/etc/containers/systemd/users/<UID>/` are admin-authored, root-owned, and processed by the user-mode Quadlet generator only for the matching UID. The multi-tenant layer renders tenant pods here so the **host owns the desired config** while the **tenant service account owns runtime state**. See `reference/tenant_quadlets.md`.
 
 ## Lifecycle
 

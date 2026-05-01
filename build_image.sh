@@ -28,7 +28,19 @@ podman build -t "${REPO}:backup-container" -f "${ASSETS_DIR}/backup-container.Co
 echo "Building os-builder..."
 podman build -t "${REPO}:os-builder" -f "${ASSETS_DIR}/os-builder.Containerfile" "${ASSETS_DIR}"
 
-# 4. Build the bootc host image
+# 4. Build the multi-tenant Phase-0 stub images.
+# These are referenced by the Quadlet templates that platformctl renders
+# per-tenant. They are intentionally minimal Phase-0 scaffolds.
+# See docs/concepts/multi_tenant_architecture.md.
+MT_DIR="${ASSETS_DIR}/multi_tenant"
+echo "Building openclaw-runtime (stub)..."
+podman build -t "${REPO}:openclaw-runtime" -f "${MT_DIR}/openclaw-runtime.Containerfile" "${MT_DIR}"
+echo "Building credential-proxy (stub)..."
+podman build -t "${REPO}:credential-proxy" -f "${MT_DIR}/credential-proxy.Containerfile" "${MT_DIR}"
+echo "Building onboarding-env (stub)..."
+podman build -t "${REPO}:onboarding-env" -f "${MT_DIR}/onboarding-env.Containerfile" "${MT_DIR}"
+
+# 5. Build the bootc host image
 # The OCI image is shareable: no SSH keys, no passwords, no per-user identity
 # is baked in. Credentials are injected at deployment time (qcow2/ISO/install)
 # via bootc-image-builder --config or a cloud-init seed. See ./02_build_vm/.
@@ -40,6 +52,9 @@ echo "Images created:"
 echo "  - ${REPO}:dev-container"
 echo "  - ${REPO}:backup-container"
 echo "  - ${REPO}:os-builder"
+echo "  - ${REPO}:openclaw-runtime    (multi-tenant Phase-0 stub)"
+echo "  - ${REPO}:credential-proxy    (multi-tenant Phase-0 stub)"
+echo "  - ${REPO}:onboarding-env      (multi-tenant Phase-0 stub)"
 echo "  - ${REPO}:latest (host image, tagged locally as gpu-bootc-host:latest)"
 echo ""
 echo "Next steps:"

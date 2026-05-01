@@ -1,0 +1,20 @@
+# Onboarding env container for an OpenClaw tenant.
+# This is the shell the tenant SSHes into during initial enrollment.
+# Mutable inside the container; sudo allowed inside the container only.
+[Unit]
+Description=OpenClaw onboarding env for tenant ${TENANT}
+After=${TENANT}-onboard-pod.service
+BindsTo=${TENANT}-onboard-pod.service
+
+[Container]
+Image=quay.io/m0ranmcharles/fedora_init:onboarding-env
+Pod=${TENANT}-onboard.pod
+Volume=${TENANT_VOLUMES}:/workspace:Z
+Environment=OPENCLAW_TENANT=${TENANT}
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

@@ -11,6 +11,10 @@
   - [how-to/build_images.md](how-to/build_images.md)
   - [how-to/build_and_run_vm.md](how-to/build_and_run_vm.md)
   - [how-to/validate_gpu.md](how-to/validate_gpu.md)
+- **I want to run the host as a multi-tenant platform**
+  - [concepts/multi_tenant_architecture.md](concepts/multi_tenant_architecture.md)
+  - [reference/platformctl.md](reference/platformctl.md)
+  - [how-to/create_a_tenant.md](how-to/create_a_tenant.md)
 - **I want to understand why it's built this way**
   - [overview.md](overview.md)
   - [concepts/](concepts/)
@@ -24,23 +28,32 @@
 
 ### Concepts
 - [concepts/access_model.md](concepts/access_model.md) — The keyless image strategy and the three paths for injecting credentials at deployment.
+- [concepts/agent_provisioning.md](concepts/agent_provisioning.md) — Agent self-provisioning via `agentctl`, policy / quota / grant validation (planned).
 - [concepts/bootc_and_ostree.md](concepts/bootc_and_ostree.md) — How bootc and OSTree provide an immutable, versioned filesystem for the host OS.
+- [concepts/credential_broker.md](concepts/credential_broker.md) — Tenant credential ownership, scoped grants, login-URL flow (planned).
 - [concepts/gpu_stack.md](concepts/gpu_stack.md) — Architectural split of NVIDIA drivers, toolkit, and CDI across host and container layers.
+- [concepts/multi_tenant_architecture.md](concepts/multi_tenant_architecture.md) — Multi-tenant rootless-Podman platform: per-tenant non-login service accounts, host control plane, OpenClaw agent pods.
 - [concepts/ownership_model.md](concepts/ownership_model.md) — The 3-layer division of responsibility between the host, containers, and Quadlets.
 - [concepts/state_and_persistence.md](concepts/state_and_persistence.md) — Categorization of system state into four persistence levels across host and containers.
+- [concepts/tenant_identity_model.md](concepts/tenant_identity_model.md) — Non-login service accounts, subuid/subgid, rootless Podman per tenant.
+- [concepts/tenant_storage_layout.md](concepts/tenant_storage_layout.md) — `/var/lib/openclaw-platform/` filesystem layout and mount policy.
 - [concepts/update_pipeline.md](concepts/update_pipeline.md) — The automated ephemeral-build and staging process for host image updates.
 
 ### Reference
+- [reference/agentctl.md](reference/agentctl.md) — Agent-facing CLI for self-provisioning (planned).
 - [reference/images.md](reference/images.md) — Factual catalog of the host, dev, backup, and builder container images.
+- [reference/platformctl.md](reference/platformctl.md) — Admin CLI for tenant lifecycle on the multi-tenant host.
 - [reference/quadlets.md](reference/quadlets.md) — Explanation of Quadlet placement rules and their role in bridging systemd and Podman.
 - [reference/registry.md](reference/registry.md) — Configuration details for the Quay.io namespace and image tagging conventions.
 - [reference/repository_layout.md](reference/repository_layout.md) — Descriptive catalog of the directories, files, and top-level scripts in the repository.
 - [reference/scripts.md](reference/scripts.md) — Reference catalog of the shell and Python scripts for building and maintaining the system.
 - [reference/systemd_units.md](reference/systemd_units.md) — Catalog of project-specific systemd units and native host services enabled in the image.
+- [reference/tenant_quadlets.md](reference/tenant_quadlets.md) — Tenant-pod Quadlet templates and per-UID placement under `/etc/containers/systemd/users/`.
 
 ### How-to
 - [how-to/build_and_run_vm.md](how-to/build_and_run_vm.md) — Procedure for converting the image to qcow2 and booting it with libvirt.
 - [how-to/build_images.md](how-to/build_images.md) — Procedure for building the host image and its associated containers on a local workstation.
+- [how-to/create_a_tenant.md](how-to/create_a_tenant.md) — Admin walkthrough for `platformctl tenant create`.
 - [how-to/distribute_image.md](how-to/distribute_image.md) — Instructions for a third party to boot the published image with their own SSH key.
 - [how-to/push_to_quay.md](how-to/push_to_quay.md) — Guide for publishing the built images to the Quay registry.
 - [how-to/run_locally.md](how-to/run_locally.md) — Steps to run an ephemeral root shell in the host image without a virtual machine.
