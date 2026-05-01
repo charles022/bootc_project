@@ -89,6 +89,15 @@ The primary collection of artifacts baked into or used to build the project imag
 - `autologin.conf`: Systemd override for console autologin.
 - `dev_container_test.py`: Validation tests for the dev container environment.
 
+### `01_build_image/build_assets/multi_tenant/`
+Phase-0 scaffold for the multi-tenant layer (`concepts/multi_tenant_architecture.md`).
+- `platformctl.sh`: Admin CLI installed at `/usr/local/bin/platformctl`.
+- `openclaw-broker.sh` + `openclaw-broker.service`: Phase-0 stub for the host credential broker.
+- `tenant-*.tmpl`: Quadlet templates rendered per-tenant by `platformctl`.
+- `openclaw-runtime.Containerfile` + `openclaw-runtime-stub.sh`: Stub agent runtime image.
+- `credential-proxy.Containerfile` + `credential-proxy-stub.sh`: Stub credential-proxy sidecar image.
+- `onboarding-env.Containerfile` + `onboarding-env-stub.sh`: Stub onboarding env image.
+
 ### `02_build_vm/`
 Tools for local validation of the host image in a virtual machine environment.
 - `build_vm.sh`: Converts the host image OCI artifact into a qcow2 disk and installs it into libvirt.

@@ -1,0 +1,22 @@
+# Cloudflared sidecar for an OpenClaw tenant onboarding pod.
+# Platform-controlled: tenant-readable but not tenant-writable.
+# The tunnel token must be dropped into ${TENANT_CLOUDFLARED}/ as part of
+# tunnel provisioning (planned). Until then this container restart-loops,
+# which is intentional Phase-0 behavior.
+[Unit]
+Description=Cloudflared sidecar for tenant ${TENANT}
+After=${TENANT}-onboard-pod.service
+BindsTo=${TENANT}-onboard-pod.service
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:latest
+Pod=${TENANT}-onboard.pod
+Volume=${TENANT_CLOUDFLARED}:/etc/cloudflared:ro,Z
+Exec=tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

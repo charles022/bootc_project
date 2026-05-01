@@ -26,5 +26,11 @@ if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi || true; else echo "nv
 # Confirm that the pod service is known to systemd. # pod service visibility check
 systemctl status devpod.service --no-pager || true # generated Quadlet service status
 
+# Multi-tenant layer smoke checks. # mta smoke checks
+command -v platformctl >/dev/null 2>&1 && echo "platformctl present: $(command -v platformctl)" || echo "platformctl missing" # platformctl presence
+systemctl is-enabled openclaw-broker.service || true # broker stub enabled state
+[[ -d /var/lib/openclaw-platform/templates/quadlet ]] && echo "tenant Quadlet templates present" || echo "tenant Quadlet templates missing" # template dir presence
+ls /var/lib/openclaw-platform/templates/quadlet 2>/dev/null || true # list templates
+
 # Emit a clear completion marker. # host test footer
 echo "=== bootc_host_test.sh completed ===" # completion marker

@@ -1,0 +1,12 @@
+# Onboarding pod for an OpenClaw tenant.
+# Rendered by platformctl tenant create. See docs/reference/tenant_quadlets.md.
+[Unit]
+Description=OpenClaw onboarding pod for tenant ${TENANT}
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=${TENANT}-onboard
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=OpenClaw credential broker (stub)
+Documentation=file:///usr/share/doc/openclaw/credential_broker.md
+After=local-fs.target
+DefaultDependencies=yes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/openclaw-broker
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

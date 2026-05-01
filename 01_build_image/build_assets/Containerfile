@@ -15,6 +15,11 @@ RUN dnf -y install 'dnf5-command(config-manager)' \
        cloud-init \
        bash \
        coreutils \
+       passt \
+       shadow-utils \
+       systemd-container \
+       gettext \
+       jq \
     && dnf clean all
 
 # Create only the directories we need in the host image.
@@ -58,6 +63,37 @@ RUN chmod 0755 /opt/project/bootc_host_test.sh
 COPY devpod.kube /usr/share/containers/systemd/devpod.kube
 COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
+# --- Multi-tenant layer (additive) ---
+# See docs/concepts/multi_tenant_architecture.md for the design.
+# The host ships:
+#   - platformctl admin CLI
+#   - openclaw-broker stub (real broker is Phase 2)
+#   - per-tenant Quadlet templates rendered by `platformctl tenant create`
+#   - the /var/lib/openclaw-platform tree skeleton (per-tenant subtrees are
+#     created on demand)
+COPY multi_tenant/platformctl.sh /usr/local/bin/platformctl
+COPY multi_tenant/openclaw-broker.sh /usr/local/bin/openclaw-broker
+COPY multi_tenant/openclaw-broker.service /usr/lib/systemd/system/openclaw-broker.service
+RUN chmod 0755 /usr/local/bin/platformctl /usr/local/bin/openclaw-broker
+
+# Install the Quadlet templates into the platform template root so platformctl
+# can render them with envsubst at tenant-creation time.
+RUN install -d -m 0755 \
+        /var/lib/openclaw-platform \
+        /var/lib/openclaw-platform/templates \
+        /var/lib/openclaw-platform/templates/quadlet \
+        /var/lib/openclaw-platform/broker \
+        /var/lib/openclaw-platform/provisioner \
+        /var/lib/openclaw-platform/backups \
+        /var/lib/openclaw-platform/tenants \
+        /etc/containers/systemd/users
+COPY multi_tenant/tenant-onboard.pod.tmpl                 /var/lib/openclaw-platform/templates/quadlet/tenant-onboard.pod.tmpl
+COPY multi_tenant/tenant-cloudflared.container.tmpl       /var/lib/openclaw-platform/templates/quadlet/tenant-cloudflared.container.tmpl
+COPY multi_tenant/tenant-onboard-env.container.tmpl       /var/lib/openclaw-platform/templates/quadlet/tenant-onboard-env.container.tmpl
+COPY multi_tenant/tenant-openclaw-runtime.container.tmpl  /var/lib/openclaw-platform/templates/quadlet/tenant-openclaw-runtime.container.tmpl
+COPY multi_tenant/tenant-credential-proxy.container.tmpl  /var/lib/openclaw-platform/templates/quadlet/tenant-credential-proxy.container.tmpl
+RUN chmod 0644 /var/lib/openclaw-platform/templates/quadlet/*.tmpl
+
 # Seed the bootc-update config: source.env in /etc so it survives upgrades
 # with a 3-way merge (operator can repoint to a fork); reboot.env in /etc
 # for the same reason; /var/lib/bootc-update for the staging marker (lives
@@ -85,4 +121,5 @@ RUN systemctl enable sshd \
     && systemctl enable nvidia-cdi-refresh.path \
     && systemctl enable nvidia-cdi-refresh.service \
     && systemctl enable bootc-update.timer \
-    && systemctl enable bootc-firstboot-push.service
+    && systemctl enable bootc-firstboot-push.service \
+    && systemctl enable openclaw-broker.service

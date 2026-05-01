@@ -69,10 +69,19 @@ When automated runs are added later, the CDI path does not change. There are two
 ### Service patterns
 When orchestrating workloads, there is a three-pattern taxonomy: single-app containers, multi-container pods, or user-pods. This project uses a **multi-container pod via Quadlet** to group the dev container and the backup sidecar into a single dev pod. This pattern provides a shared lifecycle and network namespace for tightly coupled services while keeping distinct operational roles in independently updatable containers distributed via Quay.
 
+### Extension to multiple tenants
+
+The host/container/Quadlet split scales by **adding a fourth axis** for multi-tenant deployments: per-tenant rootless Podman runtimes owned by non-login service accounts. The host still owns hardware/boot/SSH/systemd/CDI; containers still own workload runtimes; Quadlet still bridges lifecycle. The tenant axis only changes *which user owns the rootless Podman runtime that runs a given pod* and *where its Quadlet lives* (`/etc/containers/systemd/users/<UID>/` per tenant rather than the system-wide `/usr/share/containers/systemd/`). All of the rules above — no in-container systemd, no host Podman socket inside containers, no broad host mounts — apply unchanged to tenant pods.
+
+See `concepts/multi_tenant_architecture.md`.
+
 ## See also
 - `concepts/bootc_and_ostree.md`
 - `concepts/gpu_stack.md`
+- `concepts/multi_tenant_architecture.md`
+- `concepts/tenant_identity_model.md`
 - `concepts/update_pipeline.md`
 - `reference/quadlets.md`
 - `reference/systemd_units.md`
+- `reference/tenant_quadlets.md`
 - `how-to/write_a_systemd_unit_for_the_host.md`

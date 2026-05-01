@@ -89,8 +89,23 @@ The alternative to deployment-time credentials is baking an SSH key directly int
 - The image is safe to push publicly to Quay.
 - Credentials are an operational concern of the deployment environment (the qcow2 build step, or the VM hypervisor), not a concern of the image build step.
 
+## Tenant access in the multi-tenant layer
+
+The three access paths above describe how the **admin** reaches the host. They are unchanged when the host runs as a multi-tenant platform. **Tenants** never reach the host; they reach their own containers via a per-tenant cloudflared sidecar that the platform manages on their behalf.
+
+The intended (planned) tenant access flow is:
+
+1. Admin runs `platformctl tenant create alice`. The host renders Quadlets that include a cloudflared sidecar mounted with a tenant-scoped tunnel token.
+2. The cloudflared sidecar publishes a route like `alice-onboard.example.com` that maps to the onboarding-env container's `sshd` (or HTTP entry point), behind Cloudflare Access if configured.
+3. Alice connects from her laptop to `alice-onboard.example.com`. She lands inside the container; she never reaches the host.
+4. From inside the container, the onboarding flow enrolls her credentials via the host credential broker (planned, see `concepts/credential_broker.md`).
+
+The Phase-0 scaffold ships the Quadlet template and the cloudflared sidecar, but tunnel-token provisioning is still manual — the cloudflared container restart-loops until a real token is dropped into the tenant's `cloudflared/` directory. Automating that is a Phase 1+ task. See `concepts/multi_tenant_architecture.md`.
+
 ## See also
 
+- `concepts/multi_tenant_architecture.md`
 - `concepts/ownership_model.md`
 - `concepts/state_and_persistence.md`
+- `concepts/tenant_identity_model.md`
 - `reference/scripts.md`

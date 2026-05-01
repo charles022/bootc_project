@@ -19,7 +19,15 @@ podman push --format v2s2 "${REPO}:dev-container"
 echo "Pushing os-builder..."
 podman push --format v2s2 "${REPO}:os-builder"
 
-# 4. Push the bootc host image
+# 4. Push the multi-tenant Phase-0 stub images.
+echo "Pushing openclaw-runtime..."
+podman push --format v2s2 "${REPO}:openclaw-runtime"
+echo "Pushing credential-proxy..."
+podman push --format v2s2 "${REPO}:credential-proxy"
+echo "Pushing onboarding-env..."
+podman push --format v2s2 "${REPO}:onboarding-env"
+
+# 5. Push the bootc host image
 echo "Pushing host image..."
 # Tag the local host image for the remote repository before pushing
 podman tag gpu-bootc-host:latest "${REPO}:latest"
@@ -30,4 +38,7 @@ echo "Images pushed to:"
 echo "  - ${REPO}:backup-container"
 echo "  - ${REPO}:dev-container"
 echo "  - ${REPO}:os-builder"
+echo "  - ${REPO}:openclaw-runtime"
+echo "  - ${REPO}:credential-proxy"
+echo "  - ${REPO}:onboarding-env"
 echo "  - ${REPO}:latest (Host Image)"
