@@ -12,7 +12,7 @@ The agent-facing CLI for self-provisioning. Runs **inside an OpenClaw runtime co
 |---|---|---|
 | `agentctl ping` | built | Liveness check — connect to the provisioner and read its phase number. |
 | `agentctl policy-show` | built | Print the calling tenant's policy as parsed JSON (read-only). |
-| `agentctl create-agent --name X --runtime IMG --environment IMG [--credential ID]... [--storage VOLUME]... [--ingress CLASS]... [--network PROFILE]` | built | Compose a new agent pod from approved templates. The provisioner validates against policy / quota / grants before rendering Quadlets and starting the pod under the tenant's user manager. |
+| `agentctl create-agent --name X --runtime IMG --environment IMG [--credential ID]... [--storage VOLUME]... [--ingress CLASS]... [--messaging TRANSPORT]... [--network PROFILE]` | built | Compose a new agent pod from approved templates. The provisioner validates against policy / quota / grants before rendering Quadlets and starting the pod under the tenant's user manager. |
 | `agentctl list-agents` | built | List the calling tenant's agents (no admin info; no other tenant's agents). |
 | `agentctl inspect-agent <name>` | built | Print the full agent object record. |
 | `agentctl start-agent <name>` | built | Start a previously stopped agent. |
@@ -48,10 +48,11 @@ Every `create-agent` request goes through, in order (refer to `concepts/agent_pr
 5. **Credential exists** — the provisioner calls the broker (`credential_list` admin op) to verify each credential is in the store.
 6. **Storage exists** — every requested `--storage <name>` must point at an existing directory under `/var/lib/openclaw-platform/tenants/<tenant>/volumes/`.
 7. **Forbidden flags** — every key in `policy.forbidden` whose value is `true` (`privileged`, `host_network`, `host_pid`, `host_ipc`, `host_podman_socket`, `arbitrary_host_mounts`) is checked against the request.
-8. **Quotas** — `max_agents` (count of existing agent records) and `max_running_agents` (count of those with `status: running`).
-9. **Render Quadlets** from `/var/lib/openclaw-platform/templates/agent_quadlet/`.
-10. **`systemctl --user --machine=tenant_<tenant>@ daemon-reload`** then **`start <tenant>-<agent>-pod.service`**.
-11. **Audit-log** entry written.
+8. **Messaging allowlist** — every `--messaging <transport>` must be in `policy.allowed_messaging`. Tenants cannot pass `is_main` over the per-tenant socket; that is admin-only via `platformctl agent set-main`.
+9. **Quotas** — `max_agents` (count of existing agent records) and `max_running_agents` (count of those with `status: running`).
+10. **Render Quadlets** from `/var/lib/openclaw-platform/templates/agent_quadlet/`. Messaging-bridge sidecars are rendered only for the transports listed in `--messaging`.
+11. **`systemctl --user --machine=tenant_<tenant>@ daemon-reload`** then **`start <tenant>-<agent>-pod.service`**.
+12. **Audit-log** entry written.
 
 If any step fails, the provisioner returns `{"ok": false, "error": "...", "type": "PermissionError"|...}` and the audit log records the denial.
 
@@ -82,6 +83,8 @@ The reply, on success:
     "credentials": ["alice/codex/main", "alice/github/main"],
     "volumes": ["shared-code"],
     "ingress": [],
+    "messaging": [],
+    "is_main": false,
     "network_profile": "restricted-internet",
     "status": "running",
     "created": "...",

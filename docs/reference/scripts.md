@@ -136,6 +136,35 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Side effects**: Listens on `${OPENCLAW_AGENT_SOCKET}`; forwards `credential_request` / `agent_grants` / `ping` upstream and refuses every other op.
 - **Notes**: This is the `CMD` for the `credential-proxy` container image.
 
+### `messaging-bridge-email`
+- **Path**: `/usr/local/bin/messaging-bridge-email` inside the messaging-bridge-email container (source: `01_build_image/build_assets/multi_tenant/messaging-bridge-email.py`).
+- **Purpose**: Phase-4 transport sidecar. Polls IMAP for messages from allow-listed senders, pushes JSONL envelopes to the runtime's `/run/messaging-bridge/inbound.sock`, and listens on `/run/messaging-bridge/outbound-email.sock` for `{"op":"reply",...}` envelopes the runtime posts back, sending each via SMTP.
+- **Env vars / args**: `OPENCLAW_TENANT` (required), `OPENCLAW_AGENT` (required), `OPENCLAW_BROKER_SOCKET` (default `/run/credential-proxy/broker.sock`), `OPENCLAW_MSGBUS_INBOUND` (default `/run/messaging-bridge/inbound.sock`), `OPENCLAW_MSGBUS_OUTBOUND` (default `/run/messaging-bridge/outbound-email.sock`), `OPENCLAW_EMAIL_CREDENTIAL` (default `email`), `OPENCLAW_EMAIL_POLL_SECONDS` (default `30`).
+- **Preconditions**: Per-tenant broker socket is bind-mounted; `email/main` credential is enrolled in the broker; the pod's msgbus host directory is bind-mounted at `/run/messaging-bridge`.
+- **Side effects**: Long-running poll loop, opens/closes IMAP and SMTP connections, writes log lines.
+- **Notes**: `CMD` for the `messaging-bridge-email` container image. See `concepts/messaging_interface.md`.
+
+### `messaging-bridge-signal`
+- **Path**: `/usr/local/bin/messaging-bridge-signal` inside the messaging-bridge-signal container (source: `01_build_image/build_assets/multi_tenant/messaging-bridge-signal.py`).
+- **Purpose**: Phase-4 transport sidecar. Wraps `signal-cli` in JSON-RPC daemon mode; pushes envelopes for received messages from allow-listed senders to the runtime's inbound socket, and listens on `/run/messaging-bridge/outbound-signal.sock` for replies, dispatching them via the JSON-RPC `send` method.
+- **Env vars / args**: `OPENCLAW_TENANT` (required), `OPENCLAW_AGENT` (required), `OPENCLAW_BROKER_SOCKET` (default `/run/credential-proxy/broker.sock`), `OPENCLAW_MSGBUS_INBOUND` (default `/run/messaging-bridge/inbound.sock`), `OPENCLAW_MSGBUS_OUTBOUND` (default `/run/messaging-bridge/outbound-signal.sock`), `OPENCLAW_SIGNAL_CREDENTIAL` (default `signal`).
+- **Preconditions**: A linked Signal device's local-state archive is enrolled as the `signal/main` credential (via `platformctl signal-link`).
+- **Side effects**: Long-running `signal-cli jsonRpc` subprocess; reads/writes to the pod-local message bus sockets.
+- **Notes**: `CMD` for the `messaging-bridge-signal` container image.
+
+### `messaging-bridge-whatsapp` (planned stub)
+- **Path**: `/usr/local/bin/messaging-bridge-whatsapp` inside the messaging-bridge-whatsapp container (source: `01_build_image/build_assets/multi_tenant/messaging-bridge-whatsapp.py`).
+- **Purpose**: Placeholder; logs `(planned)` and idles. Real implementation needs a Meta Business webhook receiver behind a cloudflared `messaging-webhook` ingress route — Phase 5.
+- **Notes**: Ships so the Quadlet template renders cleanly when an admin selects `--messaging whatsapp`; produces no traffic.
+
+### `openclaw-runtime-router`
+- **Path**: `/usr/local/bin/openclaw-runtime-router` inside the openclaw-runtime container (source: `01_build_image/build_assets/multi_tenant/openclaw-runtime-router.py`).
+- **Purpose**: Phase-4 message dispatcher. Listens on `/run/messaging-bridge/inbound.sock` for envelopes pushed by the messaging-bridge sidecars, matches each message body against a strict verb table (`create-agent`, `list-agents`, `stop-agent`, `status`, `help`), translates each match into an `agentctl` call over the per-tenant provisioner socket, and posts the result back to the originating bridge's `outbound-<transport>.sock`.
+- **Env vars / args**: `OPENCLAW_TENANT` (required), `OPENCLAW_AGENT` (required), `OPENCLAW_MSGBUS_DIR` (default `/run/messaging-bridge`), `OPENCLAW_MSGBUS_INBOUND` (default `${OPENCLAW_MSGBUS_DIR}/inbound.sock`), `OPENCLAW_AGENTCTL_SOCKET` (default `/run/agentctl/agentctl.sock`), `OPENCLAW_DEFAULT_RUNTIME_IMAGE` (used when a `create-agent` message omits the runtime image).
+- **Preconditions**: Per-tenant provisioner socket is bind-mounted; the pod's msgbus host directory is bind-mounted at `/run/messaging-bridge`.
+- **Side effects**: One long-lived listener on `inbound.sock`; spawns short-lived UNIX socket connections to the provisioner per verb and to per-transport outbound sockets per reply.
+- **Notes**: Default `CMD` for the `openclaw-runtime` container image. The legacy `openclaw-runtime-stub.sh` is still shipped in the image and used by the SSH-driven onboarding pod (it overrides `Exec=` to point at the stub).
+
 ## Container-side
 
 ### `dev_container_start.sh`

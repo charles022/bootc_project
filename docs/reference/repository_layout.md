@@ -90,15 +90,16 @@ The primary collection of artifacts baked into or used to build the project imag
 - `dev_container_test.py`: Validation tests for the dev container environment.
 
 ### `01_build_image/build_assets/multi_tenant/`
-Multi-tenant layer assets (`concepts/multi_tenant_architecture.md`, `concepts/credential_broker.md`, `concepts/agent_provisioning.md`).
+Multi-tenant layer assets (`concepts/multi_tenant_architecture.md`, `concepts/credential_broker.md`, `concepts/agent_provisioning.md`, `concepts/messaging_interface.md`).
 - `platformctl.sh`: Admin CLI installed at `/usr/local/bin/platformctl`.
 - `openclaw-broker.py` + `openclaw-broker.service`: Phase-2 host credential broker daemon (Fernet-encrypted store, grants, audit, admin + per-tenant sockets).
-- `openclaw-provisioner.py` + `openclaw-provisioner.service`: Phase-3 host agent-provisioning daemon (policy / quota / grant validation, agent Quadlet rendering, systemd start, audit).
-- `agentctl.py`: Phase-3 tenant-side CLI shipped inside the openclaw-runtime container.
+- `openclaw-provisioner.py` + `openclaw-provisioner.service`: Phase-3+4 host agent-provisioning daemon (policy / quota / grant / messaging validation, agent Quadlet rendering including bridge sidecars, systemd start, audit).
+- `agentctl.py`: Phase-3 tenant-side CLI shipped inside the openclaw-runtime container; carries the `--messaging` flag added in Phase 4.
 - `credential-proxy.py` + `credential-proxy.Containerfile`: Phase-2 pod-local credential proxy sidecar image.
 - `tenant-*.tmpl`: Tenant onboarding-pod Quadlet templates rendered by `platformctl tenant create`.
-- `agent_quadlet/agent-*.tmpl` + `agent_quadlet/agent.pod.tmpl`: Phase-3 agent-pod Quadlet templates rendered by `openclaw-provisioner` on each `agent_create`.
-- `openclaw-runtime.Containerfile` + `openclaw-runtime-stub.sh`: Phase-3 agent runtime image (ships python3 + agentctl; control loop is still a placeholder).
+- `agent_quadlet/agent-*.tmpl` + `agent_quadlet/agent.pod.tmpl`: Agent-pod Quadlet templates rendered by `openclaw-provisioner` on each `agent_create`. Phase 4 adds three messaging-bridge sidecar templates (`agent-messaging-bridge-{email,signal,whatsapp}.container.tmpl`).
+- `openclaw-runtime.Containerfile` + `openclaw-runtime-router.py`: Agent runtime image. Phase 4 replaces the Phase-0 idle stub with a verb-table message router.
+- `messaging-bridge-{email,signal,whatsapp}.{Containerfile,py}`: Phase-4 transport sidecars. Email + Signal are real implementations; WhatsApp ships as a stub.
 - `onboarding-env.Containerfile` + `onboarding-env-stub.sh`: Stub onboarding env image (Phase 0).
 
 ### `02_build_vm/`

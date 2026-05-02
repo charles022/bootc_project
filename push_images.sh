@@ -19,13 +19,21 @@ podman push --format v2s2 "${REPO}:dev-container"
 echo "Pushing os-builder..."
 podman push --format v2s2 "${REPO}:os-builder"
 
-# 4. Push the multi-tenant Phase-0 stub images.
+# 4. Push the multi-tenant images.
 echo "Pushing openclaw-runtime..."
 podman push --format v2s2 "${REPO}:openclaw-runtime"
 echo "Pushing credential-proxy..."
 podman push --format v2s2 "${REPO}:credential-proxy"
 echo "Pushing onboarding-env..."
 podman push --format v2s2 "${REPO}:onboarding-env"
+
+# 4b. Phase-4 messaging-bridge sidecars.
+echo "Pushing messaging-bridge-email..."
+podman push --format v2s2 "${REPO}:messaging-bridge-email"
+echo "Pushing messaging-bridge-signal..."
+podman push --format v2s2 "${REPO}:messaging-bridge-signal"
+echo "Pushing messaging-bridge-whatsapp..."
+podman push --format v2s2 "${REPO}:messaging-bridge-whatsapp"
 
 # 5. Push the bootc host image
 echo "Pushing host image..."
@@ -41,4 +49,7 @@ echo "  - ${REPO}:os-builder"
 echo "  - ${REPO}:openclaw-runtime"
 echo "  - ${REPO}:credential-proxy"
 echo "  - ${REPO}:onboarding-env"
+echo "  - ${REPO}:messaging-bridge-email"
+echo "  - ${REPO}:messaging-bridge-signal"
+echo "  - ${REPO}:messaging-bridge-whatsapp"
 echo "  - ${REPO}:latest (Host Image)"

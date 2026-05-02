@@ -57,14 +57,14 @@ An ephemeral environment used for automated host image rebuilds.
 
 ## OpenClaw runtime
 
-The agent control-loop container in a tenant pod. Phase-3 image ships `agentctl` so the (future) agent loop can self-provision through the host's `openclaw-provisioner.service`. The control-loop process itself is still a placeholder (idle process); a real LLM-driven loop drops in later without changing the host contract.
+The agent control-loop container in a tenant pod. Ships `agentctl` plus the Phase-4 verb-table message router (`openclaw-runtime-router`). The router reads inbound message envelopes posted by the messaging-bridge sidecars, dispatches a small set of verbs to `agentctl`, and replies. A real LLM-driven loop drops in later without changing the host contract.
 
 - **Path**: `01_build_image/build_assets/multi_tenant/openclaw-runtime.Containerfile`
-- **Purpose**: Host an agent inside a tenant pod, locked down (no sudo, read-only filesystem) but with `agentctl` on `PATH` so the agent can request new agent pods through the per-tenant provisioner socket bind-mounted from the host.
+- **Purpose**: Host an agent inside a tenant pod, locked down (no sudo, read-only filesystem) but with `agentctl` on `PATH` and the message-router as the default `CMD` so the agent can dispatch user messages through the per-tenant provisioner socket bind-mounted from the host.
 - **Base image**: `registry.fedoraproject.org/fedora:42`
-- **Key adds**: `bash`, `coreutils`, `python3`, `agentctl` at `/usr/local/bin/agentctl`, the placeholder `openclaw-runtime-stub.sh` startup script.
+- **Key adds**: `bash`, `coreutils`, `python3`, `agentctl` at `/usr/local/bin/agentctl`, `openclaw-runtime-router` at `/usr/local/bin/openclaw-runtime-router`, plus the legacy `openclaw-runtime-stub.sh` (used by the onboarding pod which is SSH-driven, not message-driven).
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:openclaw-runtime`
-- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod. The Quadlet template mounts `/run/openclaw-provisioner/tenants/<tenant>.sock` into `/run/agentctl/agentctl.sock` read-only.
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod. The agent Quadlet template mounts `/run/openclaw-provisioner/tenants/<tenant>.sock` into `/run/agentctl/agentctl.sock` read-only and the per-agent host directory `${PLATFORM_ROOT}/tenants/<tenant>/runtime/agents/<agent>/msgbus/` into `/run/messaging-bridge` for the pod-local message bus.
 
 ## Credential proxy
 
@@ -87,6 +87,37 @@ The shell container the tenant SSHes into during initial enrollment. Phase-0 stu
 - **Key adds**: `bash`, `coreutils`, `openssh-server`, `sudo`, the `onboarding-env-stub.sh` startup script.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:onboarding-env`
 - **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+
+## Messaging-bridge sidecars (Phase 4)
+
+Per-pod sidecars that convert external messaging traffic (email, Signal, WhatsApp) to and from the JSONL message-bus socket the `openclaw-runtime` router consumes. One image per transport. The provisioner only renders the matching `agent_quadlet/agent-messaging-bridge-<transport>.container.tmpl` when the agent's `messaging` list includes that transport. See `concepts/messaging_interface.md`.
+
+### Email
+
+- **Path**: `01_build_image/build_assets/multi_tenant/messaging-bridge-email.Containerfile`
+- **Purpose**: IMAP poll for inbound messages from allow-listed senders; SMTP send for `{"op":"reply",...}` envelopes posted by the runtime.
+- **Base image**: `registry.fedoraproject.org/fedora:42`
+- **Key adds**: `python3`, `ca-certificates`, the `messaging-bridge-email.py` daemon at `/usr/local/bin/messaging-bridge-email`.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:messaging-bridge-email`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as a tenant-pod sidecar.
+
+### Signal
+
+- **Path**: `01_build_image/build_assets/multi_tenant/messaging-bridge-signal.Containerfile`
+- **Purpose**: Wraps `signal-cli` in daemon mode. Receives messages from a linked Signal device and emits envelopes to the message bus; sends replies via `signal-cli send`.
+- **Base image**: `registry.fedoraproject.org/fedora:42`
+- **Key adds**: `python3`, `java-21-openjdk-headless`, `signal-cli` (downloaded at build time), the `messaging-bridge-signal.py` daemon at `/usr/local/bin/messaging-bridge-signal`.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:messaging-bridge-signal`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as a tenant-pod sidecar.
+
+### WhatsApp (planned)
+
+- **Path**: `01_build_image/build_assets/multi_tenant/messaging-bridge-whatsapp.Containerfile`
+- **Purpose**: Stub. Emits `(planned)` log lines and idles. Real implementation needs a Meta Business webhook receiver behind a cloudflared `messaging-webhook` ingress route — Phase 5.
+- **Base image**: `registry.fedoraproject.org/fedora:42`
+- **Key adds**: `python3`, the placeholder `messaging-bridge-whatsapp.py` script.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:messaging-bridge-whatsapp`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as a tenant-pod sidecar.
 
 ## Cloudflared sidecar (upstream image)
 

@@ -1,0 +1,32 @@
+# Email messaging-bridge sidecar for agent ${TENANT}/${AGENT}.
+# Rendered only when --messaging email is included in the agent_create request.
+# Reads the tenant's email credential through the per-tenant broker socket,
+# polls IMAP, pushes inbound envelopes to the runtime's
+# /run/messaging-bridge/inbound.sock, and listens on
+# /run/messaging-bridge/outbound-email.sock for {"op":"reply",...} envelopes
+# the runtime posts back, sending each via SMTP.
+[Unit]
+Description=Messaging bridge (email) ${TENANT}/${AGENT}
+After=${TENANT}-${AGENT}-pod.service
+BindsTo=${TENANT}-${AGENT}-pod.service
+
+[Container]
+Image=quay.io/m0ranmcharles/fedora_init:messaging-bridge-email
+Pod=${TENANT}-${AGENT}.pod
+Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_AGENT=${AGENT}
+Environment=OPENCLAW_BROKER_SOCKET=/run/credential-proxy/broker.sock
+Environment=OPENCLAW_MSGBUS_INBOUND=/run/messaging-bridge/inbound.sock
+Environment=OPENCLAW_MSGBUS_OUTBOUND=/run/messaging-bridge/outbound-email.sock
+Environment=OPENCLAW_EMAIL_CREDENTIAL=email
+Volume=/run/openclaw-broker/tenants/${TENANT}.sock:/run/credential-proxy/broker.sock:ro,Z
+Volume=${TENANT_HOME}/agents/${AGENT}/msgbus:/run/messaging-bridge:Z
+ReadOnly=true
+NoNewPrivileges=true
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

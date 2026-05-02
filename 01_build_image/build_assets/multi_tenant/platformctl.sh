@@ -170,12 +170,15 @@ Usage:
 
   platformctl audit tail [<n>]
 
-  platformctl agent  create  <tenant> --name <n> --runtime <img> --environment <img> [--credential <id> ...] [--storage <volume> ...] [--ingress <class> ...] [--network <profile>]
-  platformctl agent  list    <tenant>
-  platformctl agent  inspect <tenant> <name>
-  platformctl agent  start   <tenant> <name>
-  platformctl agent  stop    <tenant> <name>
-  platformctl agent  delete  <tenant> <name>
+  platformctl signal-link <tenant>                                  (Phase 4)
+
+  platformctl agent  create   <tenant> --name <n> --runtime <img> --environment <img> [--credential <id> ...] [--storage <volume> ...] [--ingress <class> ...] [--messaging <transport> ...] [--is-main] [--network <profile>]
+  platformctl agent  list     <tenant>
+  platformctl agent  inspect  <tenant> <name>
+  platformctl agent  start    <tenant> <name>
+  platformctl agent  stop     <tenant> <name>
+  platformctl agent  delete   <tenant> <name>
+  platformctl agent  set-main <tenant> <name>
 
   platformctl policy show <tenant>
 
@@ -303,6 +306,15 @@ allowed_networks:
   - messaging-only
   - api-only
   - restricted-internet
+
+# Messaging transports a tenant agent may attach (Phase 4). Each entry causes
+# the provisioner to render the matching messaging-bridge sidecar in the agent
+# pod when --messaging <transport> is passed to agent create. whatsapp ships
+# as a stub container today; webhook ingress wiring is Phase 5.
+allowed_messaging:
+  - email
+  - signal
+  - whatsapp
 
 default_network: restricted-internet
 
@@ -988,6 +1000,72 @@ cmd_audit_tail() {
     broker_call "${req}"
 }
 
+# ---- signal-link helper (Phase 4) ----
+# Drives `signal-cli link` interactively, captures the resulting local-state
+# directory, packs it as a base64-encoded tar.gz with the configured allow-list,
+# and stores it as the tenant's signal/main credential in the broker.
+
+cmd_signal_link() {
+    require_root
+    local tenant="${1:-}"
+    if [[ -z "${tenant}" ]]; then
+        err "signal-link: usage: signal-link <tenant>"
+        exit 1
+    fi
+    if ! getent passwd "$(tenant_user "${tenant}")" >/dev/null; then
+        err "signal-link: tenant '${tenant}' does not exist"; exit 2
+    fi
+    if ! command -v signal-cli >/dev/null 2>&1; then
+        err "signal-link: signal-cli not installed on host"
+        err "             ssh into a messaging-bridge-signal container or install signal-cli locally"
+        exit 2
+    fi
+
+    local workdir; workdir=$(mktemp -d)
+    trap 'rm -rf "${workdir}"' RETURN
+    log "running signal-cli link; scan the URL below in the Signal app"
+    printf 'When prompted, choose Settings -> Linked Devices -> Link New Device.\n'
+    signal-cli --config "${workdir}" link -n "openclaw-${tenant}"
+
+    local username
+    username=$(ls "${workdir}/data" 2>/dev/null | head -1 || true)
+    if [[ -z "${username}" ]]; then
+        err "signal-link: no linked username found in ${workdir}/data"
+        exit 3
+    fi
+    log "linked as ${username}"
+
+    printf 'Enter comma-separated allow-listed sender numbers (e.g. +15551234567,+15557654321): '
+    local allow
+    read -r allow
+
+    local archive_b64
+    archive_b64=$(tar -C "${workdir}" -czf - . | base64 -w0)
+
+    python3 - "${tenant}" "${username}" "${archive_b64}" "${allow}" <<'PY'
+import json, os, socket, sys
+tenant, username, archive_b64, allow = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+allow_senders = [a.strip() for a in allow.split(",") if a.strip()]
+payload = {
+    "username": username,
+    "data_archive": archive_b64,
+    "allow_senders": allow_senders,
+}
+sock = os.environ.get("OPENCLAW_BROKER_ADMIN_SOCK", "/run/openclaw-broker/admin.sock")
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(15)
+s.connect(sock)
+req = {"op": "credential_add", "tenant": tenant, "id": f"{tenant}/signal/main", "value": json.dumps(payload)}
+s.sendall(json.dumps(req).encode("utf-8") + b"\n")
+buf = b""
+while b"\n" not in buf:
+    chunk = s.recv(4096)
+    if not chunk: break
+    buf += chunk
+print(buf.split(b"\n", 1)[0].decode("utf-8"))
+PY
+}
+
 dispatch_audit() {
     local sub="${1:-}"; shift || true
     case "${sub}" in
@@ -1003,7 +1081,7 @@ cmd_agent_create() {
     require_root
     local tenant="${1:-}"; shift || true
     if [[ -z "${tenant}" ]]; then
-        err "agent create: usage: agent create <tenant> --name <n> --runtime <img> --environment <img> [--credential <id> ...] [--storage <volume> ...] [--ingress <class> ...] [--network <profile>]"
+        err "agent create: usage: agent create <tenant> --name <n> --runtime <img> --environment <img> [--credential <id> ...] [--storage <volume> ...] [--ingress <class> ...] [--messaging <transport> ...] [--is-main] [--network <profile>]"
         exit 1
     fi
     if ! getent passwd "$(tenant_user "${tenant}")" >/dev/null; then
@@ -1013,7 +1091,14 @@ cmd_agent_create() {
     req=$(python3 - "${tenant}" "$@" <<'PY'
 import json, sys
 tenant = sys.argv[1]
-out = {"op": "agent_create", "tenant": tenant, "credentials": [], "volumes": [], "ingress": []}
+out = {
+    "op": "agent_create",
+    "tenant": tenant,
+    "credentials": [],
+    "volumes": [],
+    "ingress": [],
+    "messaging": [],
+}
 i = 2
 while i < len(sys.argv):
     flag = sys.argv[i]
@@ -1023,17 +1108,36 @@ while i < len(sys.argv):
         key = flag[2:]
         out[key] = sys.argv[i + 1]
         i += 2
-    elif flag in ("--credential", "--storage", "--ingress"):
+    elif flag in ("--credential", "--storage", "--ingress", "--messaging"):
         if i + 1 >= len(sys.argv):
             sys.stderr.write(f"missing value for {flag}\n"); sys.exit(1)
-        key = "credentials" if flag == "--credential" else ("volumes" if flag == "--storage" else "ingress")
+        key = {
+            "--credential": "credentials",
+            "--storage": "volumes",
+            "--ingress": "ingress",
+            "--messaging": "messaging",
+        }[flag]
         out[key].append(sys.argv[i + 1])
         i += 2
+    elif flag == "--is-main":
+        out["is_main"] = True
+        i += 1
     else:
         sys.stderr.write(f"unknown arg {flag}\n"); sys.exit(1)
 print(json.dumps(out))
 PY
     ) || { err "agent create: invalid arguments"; exit 1; }
+    provisioner_call "${req}"
+}
+
+cmd_agent_set_main() {
+    require_root
+    local tenant="${1:-}" name="${2:-}"
+    if [[ -z "${tenant}" || -z "${name}" ]]; then
+        err "agent set-main: usage: agent set-main <tenant> <name>"
+        exit 1
+    fi
+    local req; req=$(mkreq agent_set_main tenant="${tenant}" name="${name}")
     provisioner_call "${req}"
 }
 
@@ -1078,12 +1182,13 @@ cmd_agent_delete() {
 dispatch_agent() {
     local sub="${1:-}"; shift || true
     case "${sub}" in
-        create)            cmd_agent_create  "$@" ;;
-        list)              cmd_agent_list    "$@" ;;
-        inspect)           cmd_agent_inspect "$@" ;;
-        stop)              cmd_agent_stop    "$@" ;;
-        start)             cmd_agent_start   "$@" ;;
-        delete)            cmd_agent_delete  "$@" ;;
+        create)            cmd_agent_create   "$@" ;;
+        list)              cmd_agent_list     "$@" ;;
+        inspect)           cmd_agent_inspect  "$@" ;;
+        stop)              cmd_agent_stop     "$@" ;;
+        start)             cmd_agent_start    "$@" ;;
+        delete)            cmd_agent_delete   "$@" ;;
+        set-main)          cmd_agent_set_main "$@" ;;
         ""|-h|--help|help) usage ;;
         *) err "unknown agent subcommand '${sub}'"; usage; exit 1 ;;
     esac
@@ -1144,6 +1249,7 @@ main() {
         audit)      dispatch_audit "$@" ;;
         agent)      dispatch_agent "$@" ;;
         policy)     dispatch_policy "$@" ;;
+        signal-link) cmd_signal_link "$@" ;;
         backup)     cmd_planned "backup $*" ;;
         ""|-h|--help|help) usage ;;
         *) err "unknown command '${cmd}'"; usage; exit 1 ;;
