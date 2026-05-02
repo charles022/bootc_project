@@ -1,0 +1,25 @@
+# WhatsApp messaging-bridge sidecar for agent ${TENANT}/${AGENT}.
+# Rendered only when --messaging whatsapp is included in the agent_create
+# request. Today the container is a stub: it logs a (planned) line and idles.
+# Real implementation needs Meta Business webhook ingress; see
+# docs/concepts/messaging_interface.md.
+[Unit]
+Description=Messaging bridge (whatsapp, planned) ${TENANT}/${AGENT}
+After=${TENANT}-${AGENT}-pod.service
+BindsTo=${TENANT}-${AGENT}-pod.service
+
+[Container]
+Image=quay.io/m0ranmcharles/fedora_init:messaging-bridge-whatsapp
+Pod=${TENANT}-${AGENT}.pod
+Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_AGENT=${AGENT}
+Volume=${TENANT_HOME}/agents/${AGENT}/msgbus:/run/messaging-bridge:Z
+ReadOnly=true
+NoNewPrivileges=true
+
+[Service]
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=default.target

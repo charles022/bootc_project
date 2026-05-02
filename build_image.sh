@@ -40,6 +40,15 @@ podman build -t "${REPO}:credential-proxy" -f "${MT_DIR}/credential-proxy.Contai
 echo "Building onboarding-env (stub)..."
 podman build -t "${REPO}:onboarding-env" -f "${MT_DIR}/onboarding-env.Containerfile" "${MT_DIR}"
 
+# Phase 4 messaging-bridge sidecars. Email + Signal are real implementations;
+# WhatsApp ships as a stub container today (webhook ingress is Phase 5).
+echo "Building messaging-bridge-email..."
+podman build -t "${REPO}:messaging-bridge-email" -f "${MT_DIR}/messaging-bridge-email.Containerfile" "${MT_DIR}"
+echo "Building messaging-bridge-signal..."
+podman build -t "${REPO}:messaging-bridge-signal" -f "${MT_DIR}/messaging-bridge-signal.Containerfile" "${MT_DIR}"
+echo "Building messaging-bridge-whatsapp (stub)..."
+podman build -t "${REPO}:messaging-bridge-whatsapp" -f "${MT_DIR}/messaging-bridge-whatsapp.Containerfile" "${MT_DIR}"
+
 # 5. Build the bootc host image
 # The OCI image is shareable: no SSH keys, no passwords, no per-user identity
 # is baked in. Credentials are injected at deployment time (qcow2/ISO/install)
@@ -52,9 +61,12 @@ echo "Images created:"
 echo "  - ${REPO}:dev-container"
 echo "  - ${REPO}:backup-container"
 echo "  - ${REPO}:os-builder"
-echo "  - ${REPO}:openclaw-runtime    (multi-tenant Phase-0 stub)"
-echo "  - ${REPO}:credential-proxy    (multi-tenant Phase-0 stub)"
-echo "  - ${REPO}:onboarding-env      (multi-tenant Phase-0 stub)"
+echo "  - ${REPO}:openclaw-runtime         (multi-tenant runtime + Phase-4 router)"
+echo "  - ${REPO}:credential-proxy         (multi-tenant Phase-2)"
+echo "  - ${REPO}:onboarding-env           (multi-tenant Phase-0 stub)"
+echo "  - ${REPO}:messaging-bridge-email   (multi-tenant Phase-4)"
+echo "  - ${REPO}:messaging-bridge-signal  (multi-tenant Phase-4)"
+echo "  - ${REPO}:messaging-bridge-whatsapp (multi-tenant Phase-4 stub)"
 echo "  - ${REPO}:latest (host image, tagged locally as gpu-bootc-host:latest)"
 echo ""
 echo "Next steps:"

@@ -13,6 +13,10 @@ Image=quay.io/m0ranmcharles/fedora_init:openclaw-runtime
 Pod=${TENANT}-onboard.pod
 Environment=OPENCLAW_TENANT=${TENANT}
 Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
+# The onboarding pod is SSH-driven, not message-driven: override the image
+# default (Phase-4 router) and use the idle stub instead. Agent pods get
+# the router; the onboarding pod stays a passive shell host.
+Exec=/usr/local/bin/openclaw-runtime-stub.sh
 ReadOnly=true
 NoNewPrivileges=true
 

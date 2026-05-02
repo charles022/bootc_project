@@ -29,12 +29,14 @@ The admin-side CLI for the multi-tenant layer. Runs on the host as `root` (or vi
 | `platformctl grant remove <tenant> <agent> <id>` | built | Revoke a single grant. |
 | `platformctl grant list [<tenant>]` | built | List grants for one tenant or all tenants. |
 | `platformctl audit tail [<n>]` | built | Print the last N broker audit-log entries (default 50). |
-| `platformctl agent create <tenant> --name X --runtime IMG --environment IMG [--credential ID]... [--storage VOL]... [--ingress CLASS]... [--network PROFILE]` | built | Compose a new agent pod. Same code path as `agentctl create-agent`, but admin-side: identity is an explicit `<tenant>` argument rather than implicit from the per-tenant socket. |
+| `platformctl signal-link <tenant>` | built | Phase-4 helper. Drives `signal-cli link` interactively to pair a Signal device, prompts for the sender allow-list, packs the resulting state and writes it to the broker as the tenant's `signal/main` credential. |
+| `platformctl agent create <tenant> --name X --runtime IMG --environment IMG [--credential ID]... [--storage VOL]... [--ingress CLASS]... [--messaging TRANSPORT]... [--is-main] [--network PROFILE]` | built | Compose a new agent pod. Same code path as `agentctl create-agent`, but admin-side: identity is an explicit `<tenant>` argument rather than implicit from the per-tenant socket. `--is-main` is admin-only. `--messaging` selects which messaging-bridge sidecars are rendered. |
 | `platformctl agent list <tenant>` | built | List the tenant's agents. |
 | `platformctl agent inspect <tenant> <name>` | built | Print one agent's full JSON record. |
 | `platformctl agent start <tenant> <name>` | built | Start a previously stopped agent. |
 | `platformctl agent stop <tenant> <name>` | built | Stop an agent's pod. |
 | `platformctl agent delete <tenant> <name>` | built | Stop, remove Quadlets, drop the record. |
+| `platformctl agent set-main <tenant> <name>` | built | Promote `<name>` to be the tenant's main agent (clearing any previously main agent). Admin-only; the per-tenant socket refuses this op. |
 | `platformctl policy show <tenant>` | built | Print the tenant's policy as parsed JSON. |
 | `platformctl backup run <tenant>` | planned | Snapshot tenant volumes, policy, credential metadata. |
 | `platformctl backup restore <tenant> --snapshot <id>` | planned | Restore from a snapshot. |

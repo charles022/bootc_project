@@ -158,6 +158,11 @@ A second template family at `/var/lib/openclaw-platform/templates/agent_quadlet/
 - `<tenant>-<agent>-dev-env.container`
 - `<tenant>-<agent>-credential-proxy.container`
 - `<tenant>-<agent>-cloudflared.container` (only when the request specifies `--ingress`)
+- `<tenant>-<agent>-messaging-bridge-email.container` (only when the request specifies `--messaging email`)
+- `<tenant>-<agent>-messaging-bridge-signal.container` (only when the request specifies `--messaging signal`)
+- `<tenant>-<agent>-messaging-bridge-whatsapp.container` (only when the request specifies `--messaging whatsapp`; the WhatsApp container is currently a stub)
+
+The messaging-bridge sidecars share a per-agent host directory at `${PLATFORM_ROOT}/tenants/<tenant>/runtime/agents/<agent>/msgbus/` with the openclaw-runtime container — the bridge writes a UNIX socket there, the runtime connects to it. The provisioner creates and chowns this directory to `tenant_<tenant>` when it processes a request that includes `--messaging`. See `concepts/messaging_interface.md`.
 
 See `concepts/agent_provisioning.md` for the validation pipeline and `how-to/create_an_agent.md` for the operator walkthrough.
 

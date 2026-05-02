@@ -74,6 +74,7 @@ def cmd_create_agent(args):
         "credentials": args.credential or [],
         "volumes": args.storage or [],
         "ingress": args.ingress or [],
+        "messaging": args.messaging or [],
     }
     if args.network:
         req["network"] = args.network
@@ -135,6 +136,10 @@ def build_parser():
                     help="tenant volume name to attach at /workspace/<name>; repeatable")
     sp.add_argument("--ingress", action="append",
                     help="ingress class label, e.g. dev-ssh; repeatable; opt-in cloudflared sidecar")
+    sp.add_argument("--messaging", action="append",
+                    help="messaging transport (email, signal, whatsapp); repeatable; "
+                         "must appear in policy.allowed_messaging; renders the matching "
+                         "messaging-bridge sidecar in the agent pod")
     sp.add_argument("--network",
                     help="network profile (must appear in policy.allowed_networks)")
     sp.set_defaults(func=cmd_create_agent)

@@ -1,7 +1,8 @@
 # OpenClaw runtime container for agent ${TENANT}/${AGENT}.
 # Read-only filesystem, no privilege escalation. Mounts the per-tenant
-# provisioner and broker sockets so the agent's agentctl + credential-proxy
-# clients can reach the host daemons.
+# provisioner socket so the in-container agentctl can reach the host
+# daemon, and the pod-local messaging-bridge directory so the runtime's
+# verb-table router can read inbound message envelopes.
 [Unit]
 Description=OpenClaw runtime ${TENANT}/${AGENT}
 After=${TENANT}-${AGENT}-pod.service
@@ -13,7 +14,11 @@ Pod=${TENANT}-${AGENT}.pod
 Environment=OPENCLAW_TENANT=${TENANT}
 Environment=OPENCLAW_AGENT=${AGENT}
 Environment=OPENCLAW_NETWORK=${NETWORK}
+Environment=OPENCLAW_MSGBUS_DIR=/run/messaging-bridge
+Environment=OPENCLAW_MSGBUS_INBOUND=/run/messaging-bridge/inbound.sock
+Environment=OPENCLAW_AGENTCTL_SOCKET=/run/agentctl/agentctl.sock
 Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
+Volume=${TENANT_HOME}/agents/${AGENT}/msgbus:/run/messaging-bridge:Z
 ReadOnly=true
 NoNewPrivileges=true
 

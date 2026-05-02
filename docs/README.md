@@ -18,6 +18,7 @@
   - [how-to/verify_tenant_isolation.md](how-to/verify_tenant_isolation.md)
   - [how-to/enroll_a_credential.md](how-to/enroll_a_credential.md)
   - [how-to/create_an_agent.md](how-to/create_an_agent.md)
+  - [how-to/enroll_messaging.md](how-to/enroll_messaging.md)
 - **I want to understand why it's built this way**
   - [overview.md](overview.md)
   - [concepts/](concepts/)
@@ -35,6 +36,7 @@
 - [concepts/bootc_and_ostree.md](concepts/bootc_and_ostree.md) — How bootc and OSTree provide an immutable, versioned filesystem for the host OS.
 - [concepts/credential_broker.md](concepts/credential_broker.md) — Tenant credential ownership, encrypted store, scoped grants, audit log, wire protocol.
 - [concepts/gpu_stack.md](concepts/gpu_stack.md) — Architectural split of NVIDIA drivers, toolkit, and CDI across host and container layers.
+- [concepts/messaging_interface.md](concepts/messaging_interface.md) — Phase-4 messaging-bridge sidecars, runtime verb-table router, sender allow-listing.
 - [concepts/multi_tenant_architecture.md](concepts/multi_tenant_architecture.md) — Multi-tenant rootless-Podman platform: per-tenant non-login service accounts, host control plane, OpenClaw agent pods.
 - [concepts/ownership_model.md](concepts/ownership_model.md) — The 3-layer division of responsibility between the host, containers, and Quadlets.
 - [concepts/state_and_persistence.md](concepts/state_and_persistence.md) — Categorization of system state into four persistence levels across host and containers.
@@ -63,6 +65,7 @@
 - [how-to/create_an_agent.md](how-to/create_an_agent.md) — Phase-3 agent provisioning via `platformctl agent create` or `agentctl create-agent`.
 - [how-to/distribute_image.md](how-to/distribute_image.md) — Instructions for a third party to boot the published image with their own SSH key.
 - [how-to/enroll_a_credential.md](how-to/enroll_a_credential.md) — Phase-2 credential enrollment, grants, and verification through the broker.
+- [how-to/enroll_messaging.md](how-to/enroll_messaging.md) — Phase-4 walkthrough: enroll email / Signal credentials, set sender allow-list, attach a bridge to the main agent.
 - [how-to/verify_tenant_isolation.md](how-to/verify_tenant_isolation.md) — Phase-1 isolation checks via `platformctl tenant verify-isolation`.
 - [how-to/push_to_quay.md](how-to/push_to_quay.md) — Guide for publishing the built images to the Quay registry.
 - [how-to/run_locally.md](how-to/run_locally.md) — Steps to run an ephemeral root shell in the host image without a virtual machine.

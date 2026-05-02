@@ -4,9 +4,11 @@
 
 How agents (LLM-driven processes inside an `openclaw-runtime` container) request new agents, storage, and credentials, and how the host validates each request before generating Quadlet/systemd units.
 
-**Status: built (Phase 3).** The agent-facing CLI (`agentctl`, `reference/agentctl.md`) lives inside the `openclaw-runtime` container. It connects over a tenant-specific UNIX socket (bind-mounted from the host) to `openclaw-provisioner.service` on the host, which reads the tenant's `policy.yaml`, validates each request against allowed images / credentials / networks / volumes / quotas / forbidden flags, cross-checks credentials with the broker, renders agent Quadlets from `/var/lib/openclaw-platform/templates/agent_quadlet/`, and starts the new pod under the tenant's user manager. Every allow / deny is appended to `/var/lib/openclaw-platform/provisioner/audit.log`.
+**Status: built (Phase 3 + Phase 4 messaging additions).** The agent-facing CLI (`agentctl`, `reference/agentctl.md`) lives inside the `openclaw-runtime` container. It connects over a tenant-specific UNIX socket (bind-mounted from the host) to `openclaw-provisioner.service` on the host, which reads the tenant's `policy.yaml`, validates each request against allowed images / credentials / networks / volumes / quotas / forbidden flags / allowed messaging transports, cross-checks credentials with the broker, renders agent Quadlets from `/var/lib/openclaw-platform/templates/agent_quadlet/` (including the messaging-bridge sidecars matching the request's `--messaging` list), and starts the new pod under the tenant's user manager. Every allow / deny is appended to `/var/lib/openclaw-platform/provisioner/audit.log`.
 
-What is **still planned**: `agentctl create-env` (build new environment images on demand) and `agentctl attach-storage` / `detach-storage` (volume changes after agent creation). Per-agent CPU / memory cgroup enforcement is recorded in the agent object but not yet pushed into the Quadlet — that and messaging-driven creation are Phase 4 / 5 work.
+Phase 4 added two agent-record fields: `is_main` (at most one main agent per tenant; admin-only via `platformctl agent set-main`) and `messaging` (subset of `policy.allowed_messaging`). The messaging interface itself — bridge ↔ runtime protocol, verb dispatch, status reporting — is documented in `concepts/messaging_interface.md`.
+
+What is **still planned**: `agentctl create-env` (build new environment images on demand) and `agentctl attach-storage` / `detach-storage` (volume changes after agent creation). Per-agent CPU / memory cgroup enforcement is recorded in the agent object but not yet pushed into the Quadlet — that is Phase 5 work.
 
 ## Why
 
@@ -173,6 +175,8 @@ agent:
   credentials: [alice/codex/main, alice/github/fedora_init]
   volumes: [alice/shared-code, alice/agent-rust-private]
   ingress: [signal-route, dev-ssh]
+  messaging: [email, signal]      # Phase 4; subset of policy.allowed_messaging
+  is_main: false                  # Phase 4; admin-only via platformctl agent set-main
   network_profile: restricted-internet
   status: running
 
@@ -211,6 +215,7 @@ JSONL over UNIX socket; one request per connection.
 | `agent_start` | `tenant`, `name` | `{"ok": true}` |
 | `agent_stop` | `tenant`, `name` | `{"ok": true}` |
 | `agent_delete` | `tenant`, `name` | `{"ok": true, "removed": [...]}` |
+| `agent_set_main` | `tenant`, `name` | `{"ok": true, "agent": {...}, "cleared": [...]}` — admin-only; the per-tenant socket refuses this op |
 | `tenant_register` | `tenant`, `uid`, `gid` | `{"ok": true}` |
 | `tenant_unregister` | `tenant` | `{"ok": true}` |
 | `audit_tail` | optional `n` | `{"ok": true, "entries": [...]}` |
@@ -235,10 +240,9 @@ Errors always have shape `{"ok": false, "error": "...", "type": "..."}`.
 
 ## Still planned
 
-- **`agentctl create-env`** — build a new environment image variant from an approved base. Today the policy lists allowed environment images; the agent picks one of them. Building new ones is Phase 4.
+- **`agentctl create-env`** — build a new environment image variant from an approved base. Today the policy lists allowed environment images; the agent picks one of them.
 - **`agentctl attach-storage` / `detach-storage`** — volume changes after agent creation. Today volumes are bound at create-time only.
 - **CPU / memory cgroup enforcement.** The agent record carries `network_profile`; future work pushes `MemoryMax=` / `CPUQuota=` into the Quadlet from policy `limits`.
-- **Messaging-driven creation.** Phase 4.
 
 ## See also
 

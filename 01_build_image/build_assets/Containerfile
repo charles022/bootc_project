@@ -109,6 +109,11 @@ COPY multi_tenant/agent_quadlet/agent-openclaw-runtime.container.tmpl /var/lib/o
 COPY multi_tenant/agent_quadlet/agent-dev-env.container.tmpl         /var/lib/openclaw-platform/templates/agent_quadlet/agent-dev-env.container.tmpl
 COPY multi_tenant/agent_quadlet/agent-credential-proxy.container.tmpl /var/lib/openclaw-platform/templates/agent_quadlet/agent-credential-proxy.container.tmpl
 COPY multi_tenant/agent_quadlet/agent-cloudflared.container.tmpl     /var/lib/openclaw-platform/templates/agent_quadlet/agent-cloudflared.container.tmpl
+# Phase 4 messaging-bridge sidecar templates. The provisioner only renders
+# the ones whose transport is in the agent's --messaging request list.
+COPY multi_tenant/agent_quadlet/agent-messaging-bridge-email.container.tmpl    /var/lib/openclaw-platform/templates/agent_quadlet/agent-messaging-bridge-email.container.tmpl
+COPY multi_tenant/agent_quadlet/agent-messaging-bridge-signal.container.tmpl   /var/lib/openclaw-platform/templates/agent_quadlet/agent-messaging-bridge-signal.container.tmpl
+COPY multi_tenant/agent_quadlet/agent-messaging-bridge-whatsapp.container.tmpl /var/lib/openclaw-platform/templates/agent_quadlet/agent-messaging-bridge-whatsapp.container.tmpl
 RUN chmod 0644 /var/lib/openclaw-platform/templates/quadlet/*.tmpl \
             /var/lib/openclaw-platform/templates/agent_quadlet/*.tmpl
 

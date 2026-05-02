@@ -21,7 +21,16 @@
 # Out of scope (still planned, called out in docs):
 #   - agentctl create-env (build new env images on demand)
 #   - per-agent CPU / memory cgroup enforcement (recorded but not enforced)
-#   - messaging-driven creation
+#
+# Phase 4 additions:
+#   - Agent records carry `is_main: bool` (at most one main agent per tenant)
+#     and `messaging: list[str]` (subset of policy.allowed_messaging).
+#   - When `messaging` is set, the provisioner renders the matching
+#     agent-messaging-bridge-<transport>.container.tmpl sidecars into the
+#     tenant's Quadlet dir alongside the existing pod containers.
+#   - New admin op `agent_set_main` flips which agent is the tenant's
+#     main agent. Refused on the per-tenant socket: tenants do not pick
+#     their own main agent (that is an admin decision).
 
 import errno
 import grp
@@ -56,6 +65,7 @@ STATE_FILE = PROV_DIR / "STATE"
 SO_PEERCRED = getattr(socket, "SO_PEERCRED", 17)
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 ALLOWED_NETWORKS_DEFAULT = ["none", "messaging-only", "api-only", "restricted-internet"]
+ALLOWED_MESSAGING_DEFAULT = ["email", "signal", "whatsapp"]
 
 
 def now_iso():
@@ -82,7 +92,7 @@ def ensure_dirs():
 def write_state(state):
     STATE_FILE.write_text(
         f"state={state}\n"
-        f"phase=3\n"
+        f"phase=4\n"
         f"updated={now_iso()}\n"
     )
     STATE_FILE.chmod(0o640)
@@ -231,6 +241,7 @@ DEFAULT_POLICY = {
         "codex", "gemini", "claude", "email", "signal", "github",
     ],
     "allowed_networks": list(ALLOWED_NETWORKS_DEFAULT),
+    "allowed_messaging": list(ALLOWED_MESSAGING_DEFAULT),
     "default_network": "restricted-internet",
     "forbidden": {
         "privileged": True,
@@ -373,13 +384,18 @@ def envsubst(text, vars_):
     return re.sub(r"\$\{([A-Z_][A-Z0-9_]*)\}", repl, text)
 
 
+MESSAGING_TEMPLATE_PREFIX = "agent-messaging-bridge-"
+
+
 def render_agent_quadlets(tenant, name, runtime_image, env_image, network,
-                          ingress, volumes, tenant_uid, tenant_gid):
+                          ingress, volumes, tenant_uid, tenant_gid,
+                          messaging=None):
     if not TEMPLATE_DIR.exists():
         raise RuntimeError(f"agent template dir not found: {TEMPLATE_DIR}")
     target = QUADLET_DIR / str(tenant_uid)
     target.mkdir(parents=True, exist_ok=True, mode=0o755)
 
+    messaging = list(messaging or [])
     tenant_paths = TENANTS_DIR / tenant
     vol_lines = []
     for v in volumes:
@@ -403,11 +419,18 @@ def render_agent_quadlets(tenant, name, runtime_image, env_image, network,
 
     rendered = []
     for tmpl in sorted(TEMPLATE_DIR.glob("*.tmpl")):
+        tname = tmpl.name
         # Skip the cloudflared template unless ingress is requested.
-        if tmpl.name == "agent-cloudflared.container.tmpl" and not ingress:
+        if tname == "agent-cloudflared.container.tmpl" and not ingress:
             continue
-        out_name = f"{tenant}-{name}-{tmpl.name[len('agent-'):-len('.tmpl')]}"
-        if tmpl.name == "agent.pod.tmpl":
+        # Messaging-bridge templates: only render the ones matching the
+        # transports the agent has subscribed to.
+        if tname.startswith(MESSAGING_TEMPLATE_PREFIX):
+            transport = tname[len(MESSAGING_TEMPLATE_PREFIX):-len(".container.tmpl")]
+            if transport not in messaging:
+                continue
+        out_name = f"{tenant}-{name}-{tname[len('agent-'):-len('.tmpl')]}"
+        if tname == "agent.pod.tmpl":
             out_name = f"{tenant}-{name}.pod"
         out_path = target / out_name
         text = envsubst(tmpl.read_text(), env_vars)
@@ -595,6 +618,24 @@ def validate_create_request(tenant, req, policy):
         if v and req.get(k):
             raise PermissionError(f"policy forbids {k}=true on agent requests")
 
+    # Messaging bridges (Phase 4). Subset of policy.allowed_messaging; each entry
+    # causes the provisioner to render the matching messaging-bridge sidecar.
+    messaging = list(req.get("messaging") or [])
+    allowed_messaging = policy.get("allowed_messaging", ALLOWED_MESSAGING_DEFAULT) or ALLOWED_MESSAGING_DEFAULT
+    seen = set()
+    normalized_messaging = []
+    for m in messaging:
+        if not isinstance(m, str):
+            raise ValueError(f"messaging entry must be string, got {type(m).__name__}")
+        if m not in allowed_messaging:
+            raise PermissionError(f"messaging transport {m!r} not in allowed_messaging")
+        if m in seen:
+            continue
+        seen.add(m)
+        normalized_messaging.append(m)
+
+    is_main = bool(req.get("is_main", False))
+
     # Quotas
     limits = policy.get("limits", {}) or {}
     existing = list_agents(tenant)
@@ -609,6 +650,16 @@ def validate_create_request(tenant, req, policy):
         if running >= max_running:
             raise PermissionError(f"max_running_agents={max_running} reached for tenant {tenant!r}")
 
+    # At most one main agent per tenant.
+    if is_main:
+        existing_main = [a for a in existing if a.get("is_main")]
+        if existing_main:
+            names = ", ".join(a.get("id", "?") for a in existing_main)
+            raise PermissionError(
+                f"tenant {tenant!r} already has a main agent ({names}); "
+                f"use agent_set_main to switch"
+            )
+
     return {
         "name": req["name"],
         "runtime": runtime_image,
@@ -617,6 +668,8 @@ def validate_create_request(tenant, req, policy):
         "credentials": resolved_creds,
         "volumes": volumes,
         "ingress": list(req.get("ingress") or []),
+        "messaging": normalized_messaging,
+        "is_main": is_main,
     }
 
 
@@ -625,6 +678,18 @@ def cmd_agent_create(tenant, req):
     plan = validate_create_request(tenant, req, policy)
 
     pwent = pwd.getpwnam(f"tenant_{tenant}")
+
+    # Per-agent msgbus dir. The openclaw-runtime template bind-mounts it
+    # unconditionally (the Phase-4 router opens it for inbound envelopes
+    # whether or not any messaging-bridge sidecar is attached); the bind
+    # would fail at pod start if the dir did not exist. Tenant-owned so the
+    # rootless bridge process can create the socket inside.
+    msgbus_dir = TENANTS_DIR / tenant / "runtime" / "agents" / plan["name"] / "msgbus"
+    msgbus_dir.mkdir(parents=True, exist_ok=True, mode=0o770)
+    os.chown(str(msgbus_dir.parent), pwent.pw_uid, pwent.pw_gid)
+    os.chown(str(msgbus_dir.parent.parent), pwent.pw_uid, pwent.pw_gid)
+    os.chown(str(msgbus_dir), pwent.pw_uid, pwent.pw_gid)
+
     rendered = render_agent_quadlets(
         tenant=tenant,
         name=plan["name"],
@@ -635,6 +700,7 @@ def cmd_agent_create(tenant, req):
         volumes=plan["volumes"],
         tenant_uid=pwent.pw_uid,
         tenant_gid=pwent.pw_gid,
+        messaging=plan["messaging"],
     )
 
     record = {
@@ -645,6 +711,8 @@ def cmd_agent_create(tenant, req):
         "credentials": plan["credentials"],
         "volumes": plan["volumes"],
         "ingress": plan["ingress"],
+        "messaging": plan["messaging"],
+        "is_main": plan["is_main"],
         "network_profile": plan["network"],
         "status": "starting",
         "created": now_iso(),
@@ -658,7 +726,8 @@ def cmd_agent_create(tenant, req):
         record["updated"] = now_iso()
         write_agent(record)
         audit(op="agent_create", tenant=tenant, agent=plan["name"], allowed=True,
-              network=plan["network"], runtime=plan["runtime"], environment=plan["environment"])
+              network=plan["network"], runtime=plan["runtime"], environment=plan["environment"],
+              messaging=plan["messaging"], is_main=plan["is_main"])
     except subprocess.CalledProcessError as e:
         record["status"] = "failed"
         record["updated"] = now_iso()
@@ -721,6 +790,27 @@ def cmd_agent_delete(tenant, name):
     return {"ok": True, "removed": removed}
 
 
+def cmd_agent_set_main(tenant, name):
+    """Make <name> the tenant's main agent. At most one main agent at a time;
+    any previously main agent has its is_main flag cleared. Admin-only: tenants
+    do not pick their own main agent (Phase 4)."""
+    if not agent_record_path(tenant, name).exists():
+        raise KeyError(name)
+    cleared = []
+    for record in list_agents(tenant):
+        if record.get("is_main") and record.get("id") != name:
+            record["is_main"] = False
+            record["updated"] = now_iso()
+            write_agent(record)
+            cleared.append(record["id"])
+    target = json.loads(agent_record_path(tenant, name).read_text())
+    target["is_main"] = True
+    target["updated"] = now_iso()
+    write_agent(target)
+    audit(op="agent_set_main", tenant=tenant, agent=name, cleared=cleared)
+    return {"ok": True, "agent": target, "cleared": cleared}
+
+
 def cmd_policy_show(tenant):
     return {"ok": True, "policy": load_policy(tenant)}
 
@@ -728,7 +818,7 @@ def cmd_policy_show(tenant):
 def handle_admin(req):
     op = req.get("op")
     if op == "ping":
-        return {"ok": True, "phase": 3, "ts": now_iso()}
+        return {"ok": True, "phase": 4, "ts": now_iso()}
     if op == "tenant_register":
         ensure_tenant_socket(req["tenant"], req["uid"], req["gid"])
         return {"ok": True}
@@ -752,16 +842,22 @@ def handle_admin(req):
         return cmd_agent_start(req["tenant"], req["name"])
     if op == "agent_delete":
         return cmd_agent_delete(req["tenant"], req["name"])
+    if op == "agent_set_main":
+        return cmd_agent_set_main(req["tenant"], req["name"])
     raise ValueError(f"unknown admin op {op!r}")
 
 
 def handle_tenant(tenant, req):
     op = req.get("op")
     if op == "ping":
-        return {"ok": True, "tenant": tenant, "phase": 3, "ts": now_iso()}
+        return {"ok": True, "tenant": tenant, "phase": 4, "ts": now_iso()}
     if op == "policy_show":
         return cmd_policy_show(tenant)
     if op == "agent_create":
+        # Tenants may request agent creation but cannot mark a new agent as
+        # main; that is an admin decision.
+        if req.get("is_main"):
+            raise PermissionError("tenants may not set is_main; ask the admin to run agent_set_main")
         return cmd_agent_create(tenant, req)
     if op == "agent_list":
         return cmd_agent_list(tenant)
@@ -773,6 +869,8 @@ def handle_tenant(tenant, req):
         return cmd_agent_start(tenant, req["name"])
     if op == "agent_delete":
         return cmd_agent_delete(tenant, req["name"])
+    if op == "agent_set_main":
+        raise PermissionError("agent_set_main is admin-only")
     raise ValueError(f"unknown tenant op {op!r}")
 
 
