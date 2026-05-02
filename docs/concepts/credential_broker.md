@@ -1,10 +1,22 @@
-# Credential broker (planned)
+# Credential broker
 
 ## What
 
-A host-controlled service responsible for receiving, encrypting, storing, and dispensing tenant credentials (LLM API tokens, GitHub tokens, OAuth refresh tokens, messaging-service credentials, etc.) without ever handing the master credential to a guest container.
+A host-controlled daemon responsible for receiving, encrypting, storing, and dispensing tenant credentials (LLM API tokens, GitHub tokens, OAuth refresh tokens, messaging-service credentials, etc.) without ever handing the master credential to a guest container. Tenant agents reach it through a pod-local **credential-proxy** sidecar mounted with a tenant-specific socket — the proxy itself holds no master credentials and can only relay grant-checked requests for the tenant it was bound to at pod start.
 
-**Status: stub.** A placeholder service unit (`openclaw-broker.service`) is enabled in the host image so the systemd dependency graph and the `/var/lib/openclaw-platform/broker/` state directory exist. The actual broker logic — encryption, scoped grant issuance, audit log, rotation — is Phase 2 of the multi-tenant build (`roadmap.md`). This document records the design we are building toward; mark sections as built-today only when the corresponding code lands.
+**Status: built (Phase 2).** The daemon (`openclaw-broker`) ships in the host image, runs as `openclaw-broker.service` (Type=simple, Restart=on-failure), and exposes an admin socket at `/run/openclaw-broker/admin.sock` plus per-tenant sockets at `/run/openclaw-broker/tenants/<tenant>.sock` (chowned to the tenant service account). Encryption uses Fernet (AES-128-CBC + HMAC-SHA256) with a 32-byte key at `/var/lib/openclaw-platform/broker/key.bin`. Admin operations are exposed via `platformctl credential`, `platformctl grant`, and `platformctl audit` (`reference/platformctl.md`).
+
+The Phase 2 deliverables that landed:
+
+- broker daemon + UNIX-socket API on the host
+- encrypted credential store at `/var/lib/openclaw-platform/broker/store.json`
+- master key handling (key file, root-owned `0600`)
+- grant table at `/var/lib/openclaw-platform/broker/grants.json`: tenant × agent × credential × scope
+- credential-proxy container image (real, not stub)
+- rotation and revocation API (`credential rotate`, `credential delete`, `grant remove`)
+- append-only audit log at `/var/lib/openclaw-platform/broker/audit.log`
+
+What is **still planned** is called out where it appears below: the interactive `openclaw-onboard` flow inside the onboarding-env container, OAuth/login-URL handling, sealed/HSM-backed key custody, scheduled rotation, and replication. None of those is required to use the broker today; they are hardening / UX work for Phase 4 / Phase 5.
 
 ## Why
 
@@ -119,18 +131,70 @@ To keep the proxy from becoming a leak point:
 | Container compromised | credential-proxy is immutable, has no master credentials, can be revoked with the tenant |
 | Broker bug | small codebase, host-controlled, template-based generation, audit on every action |
 
-## Status checklist
+## Wire protocol
 
-When implementing the broker, drop the `(planned)` markers and update `roadmap.md`:
+JSONL over UNIX socket: one request per connection, terminated by `\n`; one reply, terminated by `\n`.
 
-- [ ] broker daemon + UNIX-socket API on the host
-- [ ] encrypted credential store at `/var/lib/openclaw-platform/broker/store.db`
-- [ ] master key handling (sealed key file, recoverable via admin)
-- [ ] grant table: tenant × agent × credential × scope
-- [ ] credential-proxy container image (real, not stub)
-- [ ] onboarding flow to enroll first credential
-- [ ] rotation and revocation API
-- [ ] audit log
+**Admin socket** `/run/openclaw-broker/admin.sock` (peer must be UID 0; enforced via `SO_PEERCRED`):
+
+| op | required fields | reply |
+|---|---|---|
+| `credential_add` | `tenant`, `id`, `value` | `{"ok": true}` |
+| `credential_get` | `tenant`, `id` | `{"ok": true, "value": "..."}` |
+| `credential_list` | optional `tenant` | `{"ok": true, "credentials": [...]}` |
+| `credential_delete` | `tenant`, `id` | `{"ok": true}` (also drops grants for that id) |
+| `credential_rotate` | `tenant`, `id`, `value` | `{"ok": true}` |
+| `grant_add` | `tenant`, `agent`, `id`, optional `scope` | `{"ok": true}` |
+| `grant_remove` | `tenant`, `agent`, `id` | `{"ok": true}` |
+| `grant_list` | optional `tenant` | `{"ok": true, "grants": [...]}` |
+| `audit_tail` | optional `n` | `{"ok": true, "entries": [...]}` |
+| `tenant_register` | `tenant`, `uid`, `gid` | `{"ok": true}` (opens per-tenant socket) |
+| `tenant_unregister` | `tenant` | `{"ok": true}` |
+| `ping` | — | `{"ok": true, "phase": 2, "ts": ...}` |
+
+Every error reply has shape `{"ok": false, "error": "...", "type": "..."}`.
+
+**Per-tenant socket** `/run/openclaw-broker/tenants/<tenant>.sock` (chowned to `tenant_<tenant>`, mode `0600`; the tenant identity is implicit from which socket the connection arrived on):
+
+| op | required fields | reply |
+|---|---|---|
+| `credential_request` | `agent`, `id` | `{"ok": true, "value": "..."}` if a grant exists, else `{"ok": false, "error": "no grant for ...", "type": "PermissionError"}` |
+| `agent_grants` | `agent` | `{"ok": true, "grants": [...]}` |
+| `ping` | — | `{"ok": true, "tenant": ..., "phase": 2, "ts": ...}` |
+
+The credential-proxy sidecar inside a tenant pod connects to its mounted broker socket and re-exposes `credential_request` / `agent_grants` / `ping` on a pod-local agent socket at `/run/credential-proxy/agent.sock`. Other ops are refused at the proxy boundary.
+
+## Files on disk
+
+| Path | Owner | Mode | Purpose |
+|---|---|---|---|
+| `/var/lib/openclaw-platform/broker/key.bin` | `root:root` | `0600` | 32-byte Fernet master key |
+| `/var/lib/openclaw-platform/broker/store.json` | `root:root` | `0600` | encrypted credential store (JSON) |
+| `/var/lib/openclaw-platform/broker/grants.json` | `root:root` | `0600` | grant table (JSON) |
+| `/var/lib/openclaw-platform/broker/audit.log` | `root:root` | `0640` | append-only audit log (JSONL) |
+| `/var/lib/openclaw-platform/broker/STATE` | `root:root` | `0640` | broker liveness marker |
+| `/run/openclaw-broker/admin.sock` | `root:root` | `0660` | admin socket |
+| `/run/openclaw-broker/tenants/<tenant>.sock` | `tenant_<tenant>` | `0600` | per-tenant socket |
+
+## Threat-mitigation summary
+
+| Failure | Mitigation |
+|---|---|
+| Agent leaks a token in chat output | broker can revoke (`credential delete` or `grant remove`); audit log records every issuance |
+| Agent skill exfiltrates the credential file | there is no credential file — only socket calls; the proxy refuses admin verbs at the pod boundary |
+| Container compromised | credential-proxy is immutable, has no master credentials, can be revoked with the tenant; broker enforces grants per-request |
+| Cross-tenant access attempt | per-tenant socket is chowned to that tenant only; broker's `credential_get` checks the credential's `tenant` field; `id` namespacing requires `<tenant>/...` |
+| Broker bug | small codebase, host-controlled, template-based generation, audit on every action, peer-UID 0 check on admin socket, AES-128 + HMAC for at-rest encryption |
+
+## Still planned
+
+The pieces below are *not* required to use the broker today; flagged so they don't get lost:
+
+- **`openclaw-onboard` interactive CLI** inside the onboarding-env container — guides a new tenant through credential enrollment without an admin running `platformctl credential add` by hand. Phase 4.
+- **OAuth / login-URL flow** for services like Codex / Gemini / Claude / GitHub. Today the admin pastes the resulting token into stdin; the planned flow has the broker generate the URL and store the token automatically. Phase 4.
+- **Sealed / HSM-backed master key.** Today the master key is a plain file on disk (root-only). A TPM-sealed or HSM-backed key would survive disk theft. Phase 5 hardening.
+- **Scheduled rotation** with rotation policies. Today rotation is manual via `platformctl credential rotate`. Phase 5.
+- **Replication.** Out of scope for a single-host workstation.
 
 ## See also
 
@@ -140,3 +204,4 @@ When implementing the broker, drop the `(planned)` markers and update `roadmap.m
 - `reference/platformctl.md`
 - `reference/agentctl.md`
 - `reference/systemd_units.md` § openclaw-broker.service
+- `how-to/enroll_a_credential.md`

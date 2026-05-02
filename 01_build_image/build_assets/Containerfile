@@ -20,6 +20,8 @@ RUN dnf -y install 'dnf5-command(config-manager)' \
        systemd-container \
        gettext \
        jq \
+       python3 \
+       python3-cryptography \
     && dnf clean all
 
 # Create only the directories we need in the host image.
@@ -67,21 +69,31 @@ COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 # See docs/concepts/multi_tenant_architecture.md for the design.
 # The host ships:
 #   - platformctl admin CLI
-#   - openclaw-broker stub (real broker is Phase 2)
+#   - openclaw-broker daemon (Phase 2: encrypted credential store, grants,
+#     audit, admin + per-tenant sockets)
+#   - openclaw-provisioner daemon (Phase 3: agent self-provisioning; reads
+#     per-tenant policy YAML, validates requests, renders agent Quadlets,
+#     drives systemd; admin + per-tenant sockets)
 #   - per-tenant Quadlet templates rendered by `platformctl tenant create`
+#   - per-agent Quadlet templates rendered by openclaw-provisioner on each
+#     agent_create call
 #   - the /var/lib/openclaw-platform tree skeleton (per-tenant subtrees are
 #     created on demand)
 COPY multi_tenant/platformctl.sh /usr/local/bin/platformctl
-COPY multi_tenant/openclaw-broker.sh /usr/local/bin/openclaw-broker
+COPY multi_tenant/openclaw-broker.py /usr/local/bin/openclaw-broker
 COPY multi_tenant/openclaw-broker.service /usr/lib/systemd/system/openclaw-broker.service
-RUN chmod 0755 /usr/local/bin/platformctl /usr/local/bin/openclaw-broker
+COPY multi_tenant/openclaw-provisioner.py /usr/local/bin/openclaw-provisioner
+COPY multi_tenant/openclaw-provisioner.service /usr/lib/systemd/system/openclaw-provisioner.service
+RUN chmod 0755 /usr/local/bin/platformctl /usr/local/bin/openclaw-broker /usr/local/bin/openclaw-provisioner
 
-# Install the Quadlet templates into the platform template root so platformctl
-# can render them with envsubst at tenant-creation time.
+# Install the Quadlet templates into the platform template root.
+# - templates/quadlet/         tenant onboarding pod, rendered by `platformctl tenant create`
+# - templates/agent_quadlet/   agent pods, rendered by openclaw-provisioner on each agent_create
 RUN install -d -m 0755 \
         /var/lib/openclaw-platform \
         /var/lib/openclaw-platform/templates \
         /var/lib/openclaw-platform/templates/quadlet \
+        /var/lib/openclaw-platform/templates/agent_quadlet \
         /var/lib/openclaw-platform/broker \
         /var/lib/openclaw-platform/provisioner \
         /var/lib/openclaw-platform/backups \
@@ -92,7 +104,13 @@ COPY multi_tenant/tenant-cloudflared.container.tmpl       /var/lib/openclaw-plat
 COPY multi_tenant/tenant-onboard-env.container.tmpl       /var/lib/openclaw-platform/templates/quadlet/tenant-onboard-env.container.tmpl
 COPY multi_tenant/tenant-openclaw-runtime.container.tmpl  /var/lib/openclaw-platform/templates/quadlet/tenant-openclaw-runtime.container.tmpl
 COPY multi_tenant/tenant-credential-proxy.container.tmpl  /var/lib/openclaw-platform/templates/quadlet/tenant-credential-proxy.container.tmpl
-RUN chmod 0644 /var/lib/openclaw-platform/templates/quadlet/*.tmpl
+COPY multi_tenant/agent_quadlet/agent.pod.tmpl                       /var/lib/openclaw-platform/templates/agent_quadlet/agent.pod.tmpl
+COPY multi_tenant/agent_quadlet/agent-openclaw-runtime.container.tmpl /var/lib/openclaw-platform/templates/agent_quadlet/agent-openclaw-runtime.container.tmpl
+COPY multi_tenant/agent_quadlet/agent-dev-env.container.tmpl         /var/lib/openclaw-platform/templates/agent_quadlet/agent-dev-env.container.tmpl
+COPY multi_tenant/agent_quadlet/agent-credential-proxy.container.tmpl /var/lib/openclaw-platform/templates/agent_quadlet/agent-credential-proxy.container.tmpl
+COPY multi_tenant/agent_quadlet/agent-cloudflared.container.tmpl     /var/lib/openclaw-platform/templates/agent_quadlet/agent-cloudflared.container.tmpl
+RUN chmod 0644 /var/lib/openclaw-platform/templates/quadlet/*.tmpl \
+            /var/lib/openclaw-platform/templates/agent_quadlet/*.tmpl
 
 # Seed the bootc-update config: source.env in /etc so it survives upgrades
 # with a 3-way merge (operator can repoint to a fork); reboot.env in /etc
@@ -122,4 +140,5 @@ RUN systemctl enable sshd \
     && systemctl enable nvidia-cdi-refresh.service \
     && systemctl enable bootc-update.timer \
     && systemctl enable bootc-firstboot-push.service \
-    && systemctl enable openclaw-broker.service
+    && systemctl enable openclaw-broker.service \
+    && systemctl enable openclaw-provisioner.service

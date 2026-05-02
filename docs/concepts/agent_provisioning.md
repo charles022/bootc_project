@@ -1,10 +1,12 @@
-# Agent provisioning (planned)
+# Agent provisioning
 
 ## What
 
-How agents (LLM-driven processes inside an `openclaw-runtime` container) request new agents, environments, storage, and credentials, and how the host validates each request before generating Quadlet/systemd units.
+How agents (LLM-driven processes inside an `openclaw-runtime` container) request new agents, storage, and credentials, and how the host validates each request before generating Quadlet/systemd units.
 
-**Status: planned.** The agent-facing CLI/API (`agentctl`) and the policy/quota engines are Phase 3 of the multi-tenant build (`roadmap.md`). This document records the design we are building toward.
+**Status: built (Phase 3).** The agent-facing CLI (`agentctl`, `reference/agentctl.md`) lives inside the `openclaw-runtime` container. It connects over a tenant-specific UNIX socket (bind-mounted from the host) to `openclaw-provisioner.service` on the host, which reads the tenant's `policy.yaml`, validates each request against allowed images / credentials / networks / volumes / quotas / forbidden flags, cross-checks credentials with the broker, renders agent Quadlets from `/var/lib/openclaw-platform/templates/agent_quadlet/`, and starts the new pod under the tenant's user manager. Every allow / deny is appended to `/var/lib/openclaw-platform/provisioner/audit.log`.
+
+What is **still planned**: `agentctl create-env` (build new environment images on demand) and `agentctl attach-storage` / `detach-storage` (volume changes after agent creation). Per-agent CPU / memory cgroup enforcement is recorded in the agent object but not yet pushed into the Quadlet — that and messaging-driven creation are Phase 4 / 5 work.
 
 ## Why
 
@@ -194,17 +196,49 @@ pod:
 | Agent creates 1000 pods | quota engine rejects past `max_agents` |
 | Bug in the host control plane | small codebase, template-based generation, dry-run mode, audit log on every action, no shell-string interpolation from agent input |
 
-## Status checklist
+## Wire protocol
 
-When implementing, drop the `(planned)` markers and update `roadmap.md`:
+JSONL over UNIX socket; one request per connection.
 
-- [ ] `agentctl` CLI binary or socket API
-- [ ] policy engine reading `tenants/<tenant>/policy/policy.yaml`
-- [ ] quota engine
-- [ ] template-driven Quadlet generation (today's `platformctl` does this only for the onboarding pod)
-- [ ] systemd daemon-reload + start/stop for tenant user units
-- [ ] audit log
-- [ ] dry-run mode for safe iteration
+**Admin socket** `/run/openclaw-provisioner/admin.sock` (peer must be UID 0; enforced via `SO_PEERCRED`):
+
+| op | required fields | reply |
+|---|---|---|
+| `policy_show` | `tenant` | `{"ok": true, "policy": {...}}` |
+| `agent_create` | `tenant`, `name`, `runtime`, `environment`, optional `credentials`, `volumes`, `ingress`, `network` | `{"ok": true, "agent": {...}, "rendered": [...]}` |
+| `agent_list` | `tenant` | `{"ok": true, "agents": [...]}` |
+| `agent_inspect` | `tenant`, `name` | `{"ok": true, "agent": {...}}` |
+| `agent_start` | `tenant`, `name` | `{"ok": true}` |
+| `agent_stop` | `tenant`, `name` | `{"ok": true}` |
+| `agent_delete` | `tenant`, `name` | `{"ok": true, "removed": [...]}` |
+| `tenant_register` | `tenant`, `uid`, `gid` | `{"ok": true}` |
+| `tenant_unregister` | `tenant` | `{"ok": true}` |
+| `audit_tail` | optional `n` | `{"ok": true, "entries": [...]}` |
+| `ping` | — | `{"ok": true, "phase": 3, ...}` |
+
+**Per-tenant socket** `/run/openclaw-provisioner/tenants/<tenant>.sock` (chowned to `tenant_<tenant>`, mode `0600`; tenant identity is implicit from which socket the connection arrived on; the same ops as above except no `tenant` field is required and `tenant_register` / `tenant_unregister` / `audit_tail` are not exposed).
+
+Errors always have shape `{"ok": false, "error": "...", "type": "..."}`.
+
+## Files on disk
+
+| Path | Owner | Mode | Purpose |
+|---|---|---|---|
+| `/var/lib/openclaw-platform/tenants/<tenant>/policy/policy.yaml` | `root:root` | `0644` | tenant policy (provisioner reads, admin edits) |
+| `/var/lib/openclaw-platform/tenants/<tenant>/agents/<agent>.json` | `root:root` | `0640` | per-agent record (object model §15.4) |
+| `/var/lib/openclaw-platform/templates/agent_quadlet/*.tmpl` | `root:root` | `0644` | agent Quadlet templates |
+| `/var/lib/openclaw-platform/provisioner/audit.log` | `root:root` | `0640` | append-only JSONL audit log |
+| `/var/lib/openclaw-platform/provisioner/STATE` | `root:root` | `0640` | provisioner liveness marker |
+| `/run/openclaw-provisioner/admin.sock` | `root:root` | `0660` | admin socket |
+| `/run/openclaw-provisioner/tenants/<tenant>.sock` | `tenant_<tenant>` | `0600` | per-tenant socket |
+| `/etc/containers/systemd/users/<UID>/<tenant>-<agent>*.{pod,container}` | `root:root` | `0644` | rendered agent Quadlets |
+
+## Still planned
+
+- **`agentctl create-env`** — build a new environment image variant from an approved base. Today the policy lists allowed environment images; the agent picks one of them. Building new ones is Phase 4.
+- **`agentctl attach-storage` / `detach-storage`** — volume changes after agent creation. Today volumes are bound at create-time only.
+- **CPU / memory cgroup enforcement.** The agent record carries `network_profile`; future work pushes `MemoryMax=` / `CPUQuota=` into the Quadlet from policy `limits`.
+- **Messaging-driven creation.** Phase 4.
 
 ## See also
 
@@ -214,3 +248,4 @@ When implementing, drop the `(planned)` markers and update `roadmap.md`:
 - `reference/platformctl.md`
 - `reference/agentctl.md`
 - `reference/tenant_quadlets.md`
+- `how-to/create_an_agent.md`

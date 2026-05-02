@@ -127,7 +127,7 @@ WantedBy=default.target
 
 ### tenant-openclaw-runtime.container.tmpl
 
-The tenant's agent runtime. Phase-0 image is a stub that prints its identity and idles.
+The tenant's agent runtime. The Phase-3 image ships `agentctl`; the per-tenant provisioner socket is bind-mounted read-only so the in-container CLI can self-provision new agent pods through the host (`concepts/agent_provisioning.md`).
 
 ```ini
 [Unit]
@@ -139,17 +139,31 @@ BindsTo=${TENANT}-onboard-pod.service
 Image=quay.io/m0ranmcharles/fedora_init:openclaw-runtime
 Pod=${TENANT}-onboard.pod
 Environment=OPENCLAW_TENANT=${TENANT}
+Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
 ReadOnly=true
+NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target
 ```
 
-`ReadOnly=true` enforces the rule that the runtime image is more locked down than the dev environment.
+`ReadOnly=true` enforces the rule that the runtime image is more locked down than the dev environment. The mounted socket is read-only — the container connects to it but cannot replace the file.
+
+## Agent Quadlet templates
+
+A second template family at `/var/lib/openclaw-platform/templates/agent_quadlet/` is rendered by `openclaw-provisioner.service` on every `agent_create` call. The provisioner substitutes `${TENANT}`, `${AGENT}`, `${RUNTIME_IMAGE}`, `${ENV_IMAGE}`, `${NETWORK}`, `${AGENT_VOLUMES_BLOCK}` (a multi-line block of `Volume=` directives), and the same path variables used by the tenant-onboarding templates. Files rendered into `/etc/containers/systemd/users/<UID>/`:
+
+- `<tenant>-<agent>.pod`
+- `<tenant>-<agent>-openclaw-runtime.container`
+- `<tenant>-<agent>-dev-env.container`
+- `<tenant>-<agent>-credential-proxy.container`
+- `<tenant>-<agent>-cloudflared.container` (only when the request specifies `--ingress`)
+
+See `concepts/agent_provisioning.md` for the validation pipeline and `how-to/create_an_agent.md` for the operator walkthrough.
 
 ### tenant-credential-proxy.container.tmpl
 
-The pod-local credential proxy. Phase-0 image is a stub; Phase-2 implements the real broker client.
+The pod-local credential proxy. Phase-2 image talks to the host `openclaw-broker` via a tenant-specific socket bind-mounted into the container.
 
 ```ini
 [Unit]
@@ -161,11 +175,17 @@ BindsTo=${TENANT}-onboard-pod.service
 Image=quay.io/m0ranmcharles/fedora_init:credential-proxy
 Pod=${TENANT}-onboard.pod
 Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_BROKER_SOCKET=/run/credential-proxy/broker.sock
+Environment=OPENCLAW_AGENT_SOCKET=/run/credential-proxy/agent.sock
+Volume=/run/openclaw-broker/tenants/${TENANT}.sock:/run/credential-proxy/broker.sock:ro,Z
 ReadOnly=true
+NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target
 ```
+
+The host-side socket file is created and chowned to `tenant_<tenant>:tenant_<tenant>` mode `0600` by `openclaw-broker.service` either at startup (it scans `/var/lib/openclaw-platform/tenants/`) or on demand when `platformctl tenant create` calls `tenant_register` over the broker admin socket.
 
 ## Lifecycle
 

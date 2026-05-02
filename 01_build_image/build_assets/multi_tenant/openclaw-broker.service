@@ -1,13 +1,20 @@
 [Unit]
-Description=OpenClaw credential broker (stub)
+Description=OpenClaw credential broker
 Documentation=file:///usr/share/doc/openclaw/credential_broker.md
 After=local-fs.target
-DefaultDependencies=yes
+Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/bin/openclaw-broker
-RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5s
+RuntimeDirectory=openclaw-broker
+RuntimeDirectoryMode=0755
+StateDirectory=openclaw-platform/broker
+StateDirectoryMode=0750
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

@@ -62,14 +62,23 @@ This document catalogs the systemd units authored for this project and the nativ
 - **Enabled at build time?**: Yes (active by default for tty1)
 - **Notes**: Intended for recovery and VM console access; does not affect SSH or network security.
 
+### openclaw-provisioner.service
+- **Path**: `/usr/lib/systemd/system/openclaw-provisioner.service`
+- **Type**: simple long-running daemon
+- **Purpose**: The host agent-provisioning daemon (`concepts/agent_provisioning.md`). Reads per-tenant `policy.yaml`, validates `agent_create` requests, renders agent Quadlets, drives the tenant's user-mode systemd to start the new pod, appends to `/var/lib/openclaw-platform/provisioner/audit.log`.
+- **Triggers**: Starts at boot via `WantedBy=multi-user.target`. `Restart=on-failure` with `RestartSec=5s`. Sets `RuntimeDirectory=openclaw-provisioner` and `StateDirectory=openclaw-platform/provisioner`. `After=openclaw-broker.service` and `Wants=openclaw-broker.service` so the broker is up first for credential cross-checks.
+- **Implements**: `/usr/local/bin/openclaw-provisioner` (Python daemon).
+- **Enabled at build time?**: Yes
+- **Notes**: Admin socket enforces peer-UID 0. Per-tenant sockets are chowned to `tenant_<tenant>` so the rootless `openclaw-runtime` container can mount them.
+
 ### openclaw-broker.service
 - **Path**: `/usr/lib/systemd/system/openclaw-broker.service`
-- **Type**: oneshot service (`RemainAfterExit=yes`)
-- **Purpose**: Phase-0 stub for the host credential broker. Ensures `/var/lib/openclaw-platform/broker/` exists and writes a state marker so other components can depend on the broker being "present" in the systemd graph.
-- **Triggers**: Starts at boot via `WantedBy=multi-user.target`.
-- **Implements**: `/usr/local/bin/openclaw-broker`.
+- **Type**: simple long-running daemon
+- **Purpose**: The host credential broker (`concepts/credential_broker.md`). Owns the encrypted credential store, the grant table, the audit log, and the admin / per-tenant UNIX sockets that tenant pods' `credential-proxy` sidecars connect through.
+- **Triggers**: Starts at boot via `WantedBy=multi-user.target`. `Restart=on-failure` with `RestartSec=5s`. Sets `RuntimeDirectory=openclaw-broker` and `StateDirectory=openclaw-platform/broker` so systemd creates `/run/openclaw-broker/` and `/var/lib/openclaw-platform/broker/` with the right modes.
+- **Implements**: `/usr/local/bin/openclaw-broker` (Python daemon).
 - **Enabled at build time?**: Yes
-- **Notes**: Issues no credentials. Real broker logic is Phase 2 of the multi-tenant build (`concepts/credential_broker.md`).
+- **Notes**: Requires `python3-cryptography`. Logs to the journal. The admin socket enforces peer-UID 0 via `SO_PEERCRED`; per-tenant sockets are chowned to `tenant_<tenant>` so the rootless tenant pod can mount them.
 
 ## Native host services
 
@@ -107,6 +116,7 @@ On a typical first boot of a new deployment, units activate in this approximate 
 2. **`nvidia-cdi-refresh.service`**: Generates the CDI spec once drivers and device nodes are ready.
 3. **`devpod.service`**: (Generated from Quadlet) Starts the dev pod once Podman and CDI are available.
 4. **`sshd.service`**: Enables remote access.
-5. **`openclaw-broker.service`**: Establishes the broker state directory (Phase-0 stub).
-6. **`bootc-host-test.service`**: Validates the health of the entire stack.
-7. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.
+5. **`openclaw-broker.service`**: Opens the admin socket and per-tenant sockets so tenant pods' credential-proxy sidecars can reach it.
+6. **`openclaw-provisioner.service`**: Opens its own admin and per-tenant sockets (after the broker) so tenant pods' openclaw-runtime containers can call `agentctl`.
+7. **`bootc-host-test.service`**: Validates the health of the entire stack.
+8. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.

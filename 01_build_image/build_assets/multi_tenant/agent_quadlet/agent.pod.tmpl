@@ -1,0 +1,12 @@
+# Agent pod for ${TENANT}/${AGENT}.
+# Rendered by openclaw-provisioner.service. See docs/concepts/agent_provisioning.md.
+[Unit]
+Description=OpenClaw agent pod ${TENANT}/${AGENT}
+After=network-online.target
+Wants=network-online.target
+
+[Pod]
+PodName=${TENANT}-${AGENT}
+
+[Install]
+WantedBy=default.target

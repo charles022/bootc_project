@@ -1,0 +1,22 @@
+# Optional cloudflared sidecar for agent ${TENANT}/${AGENT}.
+# Rendered only when the agent_create request includes ingress entries.
+# Reuses the tenant's tunnel config (mounted read-only). Each agent pod
+# can publish a different route by providing a per-agent config.yml --
+# routing details are still admin-managed via `platformctl tunnel ...`.
+[Unit]
+Description=Cloudflared sidecar ${TENANT}/${AGENT}
+After=${TENANT}-${AGENT}-pod.service
+BindsTo=${TENANT}-${AGENT}-pod.service
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:latest
+Pod=${TENANT}-${AGENT}.pod
+Volume=${TENANT_CLOUDFLARED}:/etc/cloudflared:ro,Z
+Exec=tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

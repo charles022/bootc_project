@@ -55,27 +55,27 @@ An ephemeral environment used for automated host image rebuilds.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:os-builder`
 - **Baked-in vs. pulled at runtime**: Pulled and run as an ephemeral container by the host's `bootc-update.service`.
 
-## OpenClaw runtime (Phase-0 stub)
+## OpenClaw runtime
 
-The agent control-loop container in a tenant pod. Phase-0 stub: identifies itself and idles.
+The agent control-loop container in a tenant pod. Phase-3 image ships `agentctl` so the (future) agent loop can self-provision through the host's `openclaw-provisioner.service`. The control-loop process itself is still a placeholder (idle process); a real LLM-driven loop drops in later without changing the host contract.
 
 - **Path**: `01_build_image/build_assets/multi_tenant/openclaw-runtime.Containerfile`
-- **Purpose**: Run an OpenClaw agent inside a tenant pod, locked down (no sudo, read-only filesystem). Phase-0 ships a stub; the real runtime is Phase 3 of the multi-tenant build (`concepts/multi_tenant_architecture.md`).
+- **Purpose**: Host an agent inside a tenant pod, locked down (no sudo, read-only filesystem) but with `agentctl` on `PATH` so the agent can request new agent pods through the per-tenant provisioner socket bind-mounted from the host.
 - **Base image**: `registry.fedoraproject.org/fedora:42`
-- **Key adds**: `bash`, `coreutils`, the `openclaw-runtime-stub.sh` startup script.
+- **Key adds**: `bash`, `coreutils`, `python3`, `agentctl` at `/usr/local/bin/agentctl`, the placeholder `openclaw-runtime-stub.sh` startup script.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:openclaw-runtime`
-- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod. The Quadlet template mounts `/run/openclaw-provisioner/tenants/<tenant>.sock` into `/run/agentctl/agentctl.sock` read-only.
 
-## Credential proxy (Phase-0 stub)
+## Credential proxy
 
-The pod-local credential proxy sidecar. Phase-0 stub: identifies itself and idles.
+The pod-local credential proxy sidecar. Forwards in-pod agent requests to the host `openclaw-broker` via a tenant-specific socket bind-mounted from the host. Holds no master credentials.
 
 - **Path**: `01_build_image/build_assets/multi_tenant/credential-proxy.Containerfile`
-- **Purpose**: Provide a pod-local UNIX-socket interface that talks to the host `openclaw-broker`. Phase-0 ships a stub; the real proxy is Phase 2 (`concepts/credential_broker.md`).
+- **Purpose**: Re-expose `credential_request` / `agent_grants` / `ping` on a pod-local UNIX socket at `/run/credential-proxy/agent.sock`. Refuses every admin verb at the proxy boundary. See `concepts/credential_broker.md`.
 - **Base image**: `registry.fedoraproject.org/fedora:42`
-- **Key adds**: `bash`, `coreutils`, the `credential-proxy-stub.sh` startup script.
+- **Key adds**: `python3`, the `credential-proxy.py` daemon at `/usr/local/bin/credential-proxy`.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:credential-proxy`
-- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod.
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman as part of a tenant pod. The Quadlet template mounts the host's `/run/openclaw-broker/tenants/<tenant>.sock` into `/run/credential-proxy/broker.sock` read-only.
 
 ## Onboarding env (Phase-0 stub)
 
