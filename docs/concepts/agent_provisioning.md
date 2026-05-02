@@ -225,7 +225,7 @@ Errors always have shape `{"ok": false, "error": "...", "type": "..."}`.
 | Path | Owner | Mode | Purpose |
 |---|---|---|---|
 | `/var/lib/openclaw-platform/tenants/<tenant>/policy/policy.yaml` | `root:root` | `0644` | tenant policy (provisioner reads, admin edits) |
-| `/var/lib/openclaw-platform/tenants/<tenant>/agents/<agent>.json` | `root:root` | `0640` | per-agent record (object model §15.4) |
+| `/var/lib/openclaw-platform/tenants/<tenant>/agents/<agent>.json` | `root:root` | `0640` | per-agent record (see `design/multi_tenant_architecture.md` §15.4) |
 | `/var/lib/openclaw-platform/templates/agent_quadlet/*.tmpl` | `root:root` | `0644` | agent Quadlet templates |
 | `/var/lib/openclaw-platform/provisioner/audit.log` | `root:root` | `0640` | append-only JSONL audit log |
 | `/var/lib/openclaw-platform/provisioner/STATE` | `root:root` | `0640` | provisioner liveness marker |

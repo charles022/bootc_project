@@ -42,6 +42,9 @@
 - [concepts/tenant_storage_layout.md](concepts/tenant_storage_layout.md) — `/var/lib/openclaw-platform/` filesystem layout and mount policy.
 - [concepts/update_pipeline.md](concepts/update_pipeline.md) — The automated ephemeral-build and staging process for host image updates.
 
+### Design
+- [design/multi_tenant_architecture.md](design/multi_tenant_architecture.md) — The full 23-section plan for the multi-tenant rootless-Podman platform.
+
 ### Reference
 - [reference/agentctl.md](reference/agentctl.md) — Tenant-side CLI inside the openclaw-runtime container for self-provisioning.
 - [reference/images.md](reference/images.md) — Factual catalog of the host, dev, backup, and builder container images.

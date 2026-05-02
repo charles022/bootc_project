@@ -107,7 +107,7 @@ Notes:
 
 ### tenant-onboard-env.container.tmpl
 
-The tenant's onboarding shell (sshd-bearing). Used during the first-time enrollment flow described in `concepts/multi_tenant_architecture.md` § Phase 0.
+The tenant's onboarding shell (sshd-bearing). Used during the first-time enrollment flow described in `design/multi_tenant_architecture.md` §11.3.
 
 ```ini
 [Unit]

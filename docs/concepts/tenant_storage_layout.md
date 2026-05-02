@@ -102,7 +102,7 @@ For backup and restore (planned):
 - **do not back up** `tenants/<tenant>/runtime/.local/share/containers/storage/` — these are pulled images and ephemeral container state, recoverable from the registry.
 - record the tenant's UID/GID in the policy file so a restored backup can be remapped onto a freshly recreated `tenant_<tenant>` account.
 
-The detailed backup/restore plan is `concepts/multi_tenant_architecture.md` § "What is built today vs. planned" (still planned).
+The detailed backup/restore plan is in `design/multi_tenant_architecture.md` §18 (still planned).
 
 ## See also
 

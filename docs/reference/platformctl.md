@@ -115,7 +115,7 @@ The full walkthrough is `how-to/create_an_agent.md`.
 
 ## What `tunnel` configures
 
-The cloudflared sidecar that ships with each tenant pod uses the upstream `cloudflare/cloudflared` image. It expects a config + credentials in `/etc/cloudflared/` (mounted read-only from `/var/lib/openclaw-platform/tenants/<tenant>/cloudflared/`). `platformctl tunnel set-config` and `platformctl tunnel set-credentials` install those files with root ownership; the tenant cannot rewrite them. There is no automation for actually creating the Cloudflare tunnel itself — that involves a Cloudflare API call and is part of the planned tunnel-automation work in `concepts/multi_tenant_architecture.md` § "Planned".
+The cloudflared sidecar that ships with each tenant pod uses the upstream `cloudflare/cloudflared` image. It expects a config + credentials in `/etc/cloudflared/` (mounted read-only from `/var/lib/openclaw-platform/tenants/<tenant>/cloudflared/`). `platformctl tunnel set-config` and `platformctl tunnel set-credentials` install those files with root ownership; the tenant cannot rewrite them. There is no automation for actually creating the Cloudflare tunnel itself — that involves a Cloudflare API call and is part of the planned tunnel-automation work in `design/multi_tenant_architecture.md` §20 (Phase 1/4).
 
 After installing/changing config or credentials, restart the tenant's cloudflared sidecar:
 

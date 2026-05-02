@@ -9,7 +9,7 @@ Create a new tenant on a running multi-tenant host. After completing this proced
 - per-tenant Quadlet units rendered into `/etc/containers/systemd/users/<UID>/`
 - the tenant's onboarding pod started under that tenant's rootless Podman runtime
 
-This corresponds to Phase 0 of the multi-tenant architecture (`concepts/multi_tenant_architecture.md` § "What is built today vs. planned").
+This corresponds to Phase 0 of the multi-tenant architecture (see `design/multi_tenant_architecture.md` §20).
 
 ## Prerequisites
 

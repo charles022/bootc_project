@@ -82,7 +82,7 @@ Operators can verify all tenants pairwise at any time with `sudo platformctl ten
 
 ### Recovery
 
-If the host is reinstalled from the host image, tenant accounts must be recreated and tenant volumes restored from backup (see `concepts/multi_tenant_architecture.md` § "Planned"). Tenant UIDs should be remapped consistently — the platform records the assigned UID in the tenant's policy file so backups can be restored with their original ownership.
+If the host is reinstalled from the host image, tenant accounts must be recreated and tenant volumes restored from backup (see `design/multi_tenant_architecture.md` §18). Tenant UIDs should be remapped consistently — the platform records the assigned UID in the tenant's policy file so backups can be restored with their original ownership.
 
 ## Non-negotiables
 

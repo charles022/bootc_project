@@ -124,12 +124,12 @@ Rules for what may share a pod are in `concepts/tenant_identity_model.md` § "Po
 - messaging bridges (Signal / WhatsApp / email) — Phase 4
 - backup, restore, audit-log retention — Phase 5
 - cloudflared route automation via the Cloudflare API (Phase 1 ships *config installation*; *tunnel creation* still requires an external `cloudflared tunnel create` call)
-- interactive `openclaw-onboard` flow inside the onboarding-env container — Phase 4
+Interactive `openclaw-onboard` flow inside the onboarding-env container — Phase 4
 - OAuth / login-URL flow — Phase 4
 - sealed / HSM-backed broker master key, scheduled credential rotation — Phase 5 hardening
 - `agentctl create-env`, `attach-storage` / `detach-storage`, per-agent CPU / memory cgroup enforcement — Phase 4+
 
-The phasing follows the original Multi-Tenant Architecture proposal (§20 of that document). See `roadmap.md` for the live status.
+The phasing follows the original Multi-Tenant Architecture proposal (§20 of that document). See `design/multi_tenant_architecture.md` for the full 23-section specification and `roadmap.md` for the live status.
 
 ## Non-negotiable design rules
 

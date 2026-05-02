@@ -9,6 +9,7 @@ Three categories, each answering one question. The split is borrowed from Diáta
 | Category | Question | Voice | Lifetime |
 |---|---|---|---|
 | `concepts/` | *Why* is it built this way? | Explanatory | Stable across implementations |
+| `design/` | *What* was the full plan? | Visionary | Long-lived archival spec |
 | `reference/` | *What* artifacts exist in the repo? | Descriptive, terse, factual | Updated whenever the code changes |
 | `how-to/` | *How* do I do X? | Imperative, second-person | Updated when the procedure changes |
 
@@ -53,6 +54,7 @@ When something planned becomes built: drop the `(planned)` marker and move the l
 2. **Check for overlap.** If your topic mostly belongs in an existing doc, add a section there instead. The docs work because each topic has exactly one canonical home.
 3. **Follow the shape** for that category:
    - **Concept**: `## What`, `## Why`, `## Implications`, `## See also`. Cap ~3 pages.
+   - **Design**: Detailed, sectioned specifications and full-system plans.
    - **Reference**: one section per artifact, with `Path`, `Purpose` (1 sentence), key fields, `Notes` only if non-obvious. Link to the source file; never reproduce it whole.
    - **How-to**: `## Goal`, `## Prerequisites`, `## Steps` (numbered, copy-pasteable), `## Verify`, `## Troubleshooting` (only real failures, not speculative).
 4. **Add it to `README.md`** under the matching category in "Full index" with a one-line description.
