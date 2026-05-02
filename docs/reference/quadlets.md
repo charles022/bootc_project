@@ -116,6 +116,8 @@ A placeholder sidecar used for validating pod wiring and persistence.
 ```
 * This container runs alongside the **dev container** in the same network and IPC namespace.
 
+⚠️ **DESIGN DEBT** — The backup sidecar inside the dev pod is a temporary placeholder. The final backup implementation will be a **host-level systemd service** that operates independently, creating automatic backups of dev environment files without requiring a sidecar container in the pod. Do not deepen the pod-sidecar pattern before this is redesigned.
+
 ### Keepalive in the container command
 
 The dev container's startup script ends with `tail -f /dev/null` (the equivalent of `sleep infinity`) so the container stays alive after the smoke test exits and remains reachable via `podman exec`. Without it, the pod would terminate as soon as the smoke test returned, and `restartPolicy: Always` would loop it.
