@@ -18,7 +18,7 @@ systemctl is-enabled nvidia-cdi-refresh.path || true # print path unit enabled s
 systemctl is-enabled nvidia-cdi-refresh.service || true # print service unit enabled state
 
 # Confirm whether the runtime CDI file exists. # cdi file presence check
-if [[ -f /var/run/cdi/nvidia.yaml ]]; then echo "CDI spec present: /var/run/cdi/nvidia.yaml"; else echo "CDI spec not present yet"; fi # presence message
+if [[ -f /etc/cdi/nvidia.yaml ]]; then echo "CDI spec present: /etc/cdi/nvidia.yaml"; else echo "CDI spec not present yet"; fi # presence message
 
 # Run a host GPU smoke check if nvidia-smi exists. # host gpu smoke test
 if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi || true; else echo "nvidia-smi not installed on host"; fi # optional gpu check

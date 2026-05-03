@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **bootc (bootable container)** project that replaces a traditional Fedora Server + setup-scripts workflow with an immutable, reproducible host OS plus Podman Quadlet-managed container workloads. The intended deployment target is a GPU workstation; NVIDIA driver/CDI integration is a first-class concern.
 
-User-facing documentation lives under `docs/` — start at `docs/README.md` (index) and `docs/overview.md`. The split into `concepts/`, `reference/`, and `how-to/` is defined in `docs/contributing.md`. The `.md` files in the repo root (`process_separation_model.md`, `gpu_integration_path.md`, `ostree_notes.md`, etc.) are the legacy whiteboard the new docs were built from; preserved for archive but no longer authoritative. Active build artifacts live under `01_build_image/build_assets/` and `02_build_vm/`.
+User-facing documentation lives under `docs/` — start at `docs/README.md` (index) and `docs/overview.md`. The split into `concepts/`, `reference/`, and `how-to/` is defined in `docs/contributing.md`. Legacy whiteboard `.md` files that previously lived in the repo root have been removed; their content was migrated into `docs/` and is no longer authoritative from this location. Active build artifacts live under `01_build_image/build_assets/` and `02_build_vm/`.
 
 ## Commands
 
@@ -78,7 +78,7 @@ This is the key mental model — violations of it are the most common way to bre
 - **Containers** own: workload runtimes (PyTorch stack, app code) and their startup commands. No in-container systemd.
 - **Quadlet** is the only bridge — host systemd manages *when* containers start, container CMD decides *what* they do.
 
-When adding a new behavior, ask "who owns this: machine, container, or separate cooperating service?" and place it accordingly. `process_separation_model.md` is the full decision guide.
+When adding a new behavior, ask "who owns this: machine, container, or separate cooperating service?" and place it accordingly. `docs/concepts/ownership_model.md` is the full decision guide.
 
 ### CDI is generated at runtime, not baked in
 GPU device mappings must come from `nvidia-ctk cdi generate` running on the actual host hardware (via `nvidia-cdi-refresh.service`). Do not hardcode device paths into the image or pod manifest.
@@ -93,6 +93,6 @@ The structure, terminology, and update contract for `docs/` is defined in **`doc
 ## Known caveats when editing
 
 - The `nvidia.com/gpu=all: 1` resource key syntax in `devpod.yaml` has not been validated against current Podman/NVIDIA-toolkit versions. First boot on real GPU hardware is the validation.
-- `nvidia-open` uses DKMS to build the kernel module at `dnf install` time, against whatever kernel the bootc base image ships. If `nvidia-smi` fails at boot or `/dev/nvidiactl` never appears, the fallback is either (a) add `kernel-devel` matching the base image's kernel, or (b) swap to RPM Fusion's `akmod-nvidia-open` so the build defers to first boot. See `gpu_integration_path.md`.
+- `nvidia-open` uses DKMS to build the kernel module at `dnf install` time, against whatever kernel the bootc base image ships. If `nvidia-smi` fails at boot or `/dev/nvidiactl` never appears, the fallback is either (a) add `kernel-devel` matching the base image's kernel, or (b) swap to RPM Fusion's `akmod-nvidia-open` so the build defers to first boot. See `docs/concepts/gpu_stack.md`.
 - The pod pulls `dev-container` from Quay at pod startup; `backup-container` is pulled when `backup.timer` fires. A freshly booted VM needs network for both.
 - `GEMINI.md` is a parallel project-context file for Gemini; keep it roughly in sync when architecture changes, but don't treat it as canonical over this file.
