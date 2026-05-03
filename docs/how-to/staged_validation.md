@@ -33,7 +33,9 @@ sudo platformctl agent create alice \
     --runtime quay.io/m0ranmcharles/fedora_init:openclaw-runtime \
     --environment quay.io/m0ranmcharles/fedora_init:dev-env
 UID_=$(id -u tenant_alice)
-sudo grep -n 'AddDevice=nvidia.com/gpu=all' \
+sudo grep -n 'PodmanArgs=--device=nvidia.com/gpu=all' \
+    /etc/containers/systemd/users/${UID_}/alice-gpu-test-dev-env.container
+sudo grep -n 'PodmanArgs=--security-opt=label=disable' \
     /etc/containers/systemd/users/${UID_}/alice-gpu-test-dev-env.container
 sudo machinectl shell tenant_alice@ /usr/bin/podman exec -it alice-gpu-test-dev-env nvidia-smi
 ```

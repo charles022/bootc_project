@@ -19,6 +19,9 @@ systemctl is-enabled nvidia-cdi-refresh.service || true # print service unit ena
 
 # Confirm whether the runtime CDI file exists. # cdi file presence check
 if [[ -f /etc/cdi/nvidia.yaml ]]; then echo "CDI spec present: /etc/cdi/nvidia.yaml"; else echo "CDI spec not present yet"; fi # presence message
+ls -ld /etc/cdi /etc/cdi/nvidia.yaml 2>/dev/null || true # cdi permissions
+if [[ -r /etc/cdi/nvidia.yaml ]]; then grep -n 'nvidia.com/gpu=all' /etc/cdi/nvidia.yaml || true; fi # cdi all-gpu selector
+if command -v nvidia-ctk >/dev/null 2>&1; then nvidia-ctk cdi list || true; else echo "nvidia-ctk not installed on host"; fi # cdi device listing
 
 # Run a host GPU smoke check if nvidia-smi exists. # host gpu smoke test
 if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi || true; else echo "nvidia-smi not installed on host"; fi # optional gpu check
@@ -40,6 +43,13 @@ systemctl is-enabled openclaw-provisioner.service || true # provisioner enabled 
 systemctl is-active openclaw-provisioner.service || true # provisioner active state
 [[ -S /run/openclaw-provisioner/admin.sock ]] && echo "provisioner admin socket present" || echo "provisioner admin socket missing" # provisioner admin socket presence
 [[ -d /var/lib/openclaw-platform/templates/agent_quadlet ]] && echo "agent Quadlet templates present" || echo "agent Quadlet templates missing" # agent template dir presence
+if [[ -f /var/lib/openclaw-platform/templates/agent_quadlet/agent-dev-env.container.tmpl ]]; then
+    echo "agent dev-env GPU injection template:"
+    grep -nE 'PodmanArgs=--device=nvidia.com/gpu=all|PodmanArgs=--security-opt=label=disable' \
+        /var/lib/openclaw-platform/templates/agent_quadlet/agent-dev-env.container.tmpl || true
+else
+    echo "agent dev-env template missing"
+fi
 
 # Emit a clear completion marker. # host test footer
 echo "=== bootc_host_test.sh completed ===" # completion marker

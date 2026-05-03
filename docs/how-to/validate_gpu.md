@@ -40,7 +40,9 @@ sudo platformctl agent create alice \
 Confirm the rendered dev-env Quadlet includes CDI device injection:
 ```bash
 UID_=$(id -u tenant_alice)
-sudo grep -n 'AddDevice=nvidia.com/gpu=all' \
+sudo grep -n 'PodmanArgs=--device=nvidia.com/gpu=all' \
+    /etc/containers/systemd/users/${UID_}/alice-gpu-test-dev-env.container
+sudo grep -n 'PodmanArgs=--security-opt=label=disable' \
     /etc/containers/systemd/users/${UID_}/alice-gpu-test-dev-env.container
 ```
 
@@ -80,7 +82,7 @@ sudo journalctl -u bootc-host-test.service --no-pager
 
 - **`nvidia-smi` reports "No devices were found"**: The kernel module failed to load. This usually happens if the `nvidia-open` DKMS build at image-build time was pinned against a different kernel version than the one running on the deployed host. See `concepts/gpu_stack.md` for fallback paths using `kernel-devel` matching or `akmod-nvidia-open`.
 - **`/etc/cdi/nvidia.yaml` is missing**: The `nvidia-cdi-refresh.service` failed. Check its logs with `sudo journalctl -u nvidia-cdi-refresh.service`. Note that `nvidia-cdi-refresh.path` re-runs the service when `/dev/nvidiactl` appears; if the device node is missing, the spec will not generate.
-- **`AddDevice=nvidia.com/gpu=all` is missing**: The host image does not contain the updated `agent-dev-env.container.tmpl`, or the agent was created before the template update. Recreate the agent after upgrading the host image.
+- **`PodmanArgs=--device=nvidia.com/gpu=all` is missing**: The host image does not contain the updated `agent-dev-env.container.tmpl`, or the agent was created before the template update. Recreate the agent after upgrading the host image. The template should also include `PodmanArgs=--security-opt=label=disable`.
 - **Tenant service account cannot read `/etc/cdi/nvidia.yaml`**: Check `nvidia-cdi-refresh.service` logs and file modes. The directory should be `0755` and the spec should be `0644`.
 - **Rootless tenant `nvidia-smi` fails but legacy `devpod` works**: Keep `devpod` in place and switch the tenant design to a per-agent `.kube` template or explicit `/dev/nvidia*` mappings after validating NVIDIA library injection.
-- **`cuda_available=False` inside the dev environment**: The CDI device was not injected into the container. Confirm the rendered agent dev-env Quadlet includes `AddDevice=nvidia.com/gpu=all` and that `/etc/cdi/nvidia.yaml` contains the selector.
+- **`cuda_available=False` inside the dev environment**: The CDI device was not injected into the container. Confirm the rendered agent dev-env Quadlet includes `PodmanArgs=--device=nvidia.com/gpu=all` and that `/etc/cdi/nvidia.yaml` contains the selector.

@@ -9,7 +9,8 @@ BindsTo=${TENANT}-${AGENT}-pod.service
 [Container]
 Image=${ENV_IMAGE}
 Pod=${TENANT}-${AGENT}.pod
-AddDevice=nvidia.com/gpu=all
+PodmanArgs=--device=nvidia.com/gpu=all
+PodmanArgs=--security-opt=label=disable
 Environment=OPENCLAW_TENANT=${TENANT}
 Environment=OPENCLAW_AGENT=${AGENT}
 ${AGENT_VOLUMES_BLOCK}

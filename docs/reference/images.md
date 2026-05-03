@@ -43,7 +43,7 @@ The tenant-scoped GPU development environment for agent pods.
 - **Key adds**: `bash`, `procps`, `dev_container_start.sh`, and `dev_container_test.py`.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:dev-env`
 - **Baked-in vs. pulled at runtime**: Pulled at runtime by rootless Podman as part of a tenant agent pod.
-- **Notes**: The default tenant policy allowlists this image for `allowed_images.environments`. The agent dev-env Quadlet requests `AddDevice=nvidia.com/gpu=all`; validate this rootless CDI path on NVIDIA hardware before removing the system-wide `devpod`.
+- **Notes**: The default tenant policy allowlists this image for `allowed_images.environments`. The agent dev-env Quadlet passes `--device=nvidia.com/gpu=all` and `--security-opt=label=disable` through `PodmanArgs=`; validate this rootless CDI path on NVIDIA hardware before removing the system-wide `devpod`.
 
 ## Backup service (host)
 

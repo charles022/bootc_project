@@ -82,11 +82,11 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 
 ### `bootc_host_test.sh`
 - **Path**: `/opt/project/bootc_host_test.sh` (source: `01_build_image/build_assets/bootc_host_test.sh`)
-- **Purpose**: Performs a basic smoke test of host services, GPU state, and Quadlet status at boot.
+- **Purpose**: Performs a basic smoke test of host services, GPU/CDI state, and Quadlet status at boot.
 - **Env vars / args**: None.
 - **Preconditions**: Run on the host system.
 - **Side effects**: Writes status information and diagnostic data to the system journal.
-- **Notes**: Triggered automatically by `bootc-host-test.service`.
+- **Notes**: Triggered automatically by `bootc-host-test.service`. It reports host NVIDIA CDI readiness, including `/etc/cdi/nvidia.yaml` permissions, `nvidia.com/gpu=all` selector presence, `nvidia-ctk cdi list` output when available, and the tenant dev-env template's `PodmanArgs=` GPU injection lines. It does not create tenants or agents.
 
 ### `os-builder.sh`
 - **Path**: `/usr/local/bin/os-builder.sh` (source: `01_build_image/build_assets/os-builder.sh`)

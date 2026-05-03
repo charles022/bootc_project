@@ -174,12 +174,13 @@ The per-agent dev environment. The default policy points `${ENV_IMAGE}` at `quay
 [Container]
 Image=${ENV_IMAGE}
 Pod=${TENANT}-${AGENT}.pod
-AddDevice=nvidia.com/gpu=all
+PodmanArgs=--device=nvidia.com/gpu=all
+PodmanArgs=--security-opt=label=disable
 Environment=OPENCLAW_TENANT=${TENANT}
 Environment=OPENCLAW_AGENT=${AGENT}
 ```
 
-`AddDevice=nvidia.com/gpu=all` requests the host-generated NVIDIA CDI device from the tenant service account's rootless container. Keep `/etc/cdi/` and `/etc/cdi/nvidia.yaml` readable by tenant service accounts and writable only by root. This rootless CDI path must pass `how-to/validate_gpu.md` on NVIDIA hardware before retiring the legacy `devpod`.
+`PodmanArgs=--device=nvidia.com/gpu=all` requests the host-generated NVIDIA CDI device from the tenant service account's rootless container. `PodmanArgs=--security-opt=label=disable` matches NVIDIA's Podman CDI example for SELinux labeling. Keep `/etc/cdi/` and `/etc/cdi/nvidia.yaml` readable by tenant service accounts and writable only by root. This rootless CDI path must pass `how-to/validate_gpu.md` on NVIDIA hardware before retiring the legacy `devpod`.
 
 ### tenant-credential-proxy.container.tmpl
 

@@ -46,7 +46,8 @@ The CUDA toolkit, cuDNN, and ML frameworks live entirely inside the tenant dev e
 The tenant agent dev environment is rendered from `agent-dev-env.container.tmpl` as a rootless `.container` Quadlet under `/etc/containers/systemd/users/<UID>/`. It requests the host GPU with:
 
 ```ini
-AddDevice=nvidia.com/gpu=all
+PodmanArgs=--device=nvidia.com/gpu=all
+PodmanArgs=--security-opt=label=disable
 ```
 
 This keeps GPU development inside the tenant/agent control plane and leaves the onboarding environment lightweight.
@@ -61,7 +62,7 @@ resources:
 
 *(See `01_build_image/build_assets/devpod.yaml` in the repo for the authoritative version.)*
 
-Podman's `kube play` formally documents this selector syntax. The tenant `.container` path depends on `AddDevice=nvidia.com/gpu=all` working for rootless service accounts with a readable `/etc/cdi/nvidia.yaml`. Keep the legacy `devpod` until `how-to/validate_gpu.md` passes on NVIDIA hardware.
+Podman's `kube play` formally documents this selector syntax. NVIDIA documents CDI for Podman with `podman run --device nvidia.com/gpu=all --security-opt=label=disable`. Podman's Quadlet docs show `AddDevice=` with host device paths, so the tenant `.container` path uses `PodmanArgs=` to pass the documented CDI device and SELinux label options through to `podman run`. Keep the legacy `devpod` until `how-to/validate_gpu.md` passes on NVIDIA hardware.
 
 ### Boot-time flow
 
@@ -75,7 +76,7 @@ systemd Quadlet generator         # at boot, and on `systemctl daemon-reload`
 podman run via Quadlet            # generated <tenant>-<agent>-dev-env.service
     |
     v
-sees AddDevice=nvidia.com/gpu=all
+sees PodmanArgs=--device=nvidia.com/gpu=all
     |
     v
 reads /etc/cdi/nvidia.yaml        # produced by nvidia-cdi-refresh.service
@@ -96,9 +97,9 @@ The `nvidia-open` package builds the kernel module via DKMS during `dnf install`
 - `akmod-nvidia` (RPM Fusion proprietary) is rejected for the same proprietary-path reason; `akmod-nvidia-open` remains the deferred-build fallback if the in-Containerfile DKMS path proves unreliable.
 - The toolkit/driver split keeps userspace CUDA inside the workload container via `nvidia-container-toolkit` + CDI, rather than exposing CUDA on the host. This avoids tying application lifecycles to the host driver lifecycle.
 
-### Rootless CDI selector syntax not validated
+### Rootless CDI via Quadlet not validated
 
-The `AddDevice=nvidia.com/gpu=all` line in the tenant `.container` Quadlet has not been validated end-to-end against current Podman and NVIDIA-toolkit versions under a tenant service account. First boot on real GPU hardware is the validation point. If rootless CDI fails, keep `devpod` and switch the tenant path to per-agent `.kube` templates or explicit `/dev/nvidia*` mappings after validating library injection.
+The `PodmanArgs=--device=nvidia.com/gpu=all` and `PodmanArgs=--security-opt=label=disable` lines in the tenant `.container` Quadlet have not been validated end-to-end against current Podman and NVIDIA-toolkit versions under a tenant service account. First boot on real GPU hardware is the validation point. If rootless CDI fails, keep `devpod` and switch the tenant path to per-agent `.kube` templates or explicit `/dev/nvidia*` mappings after validating library injection.
 
 ## See also
 
