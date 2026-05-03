@@ -11,10 +11,10 @@ Host Image (Hardware & Boot)
   │
   ├─ Quadlet (Lifecycle Bridge)
   │    │
-  │    └─ devpod.kube / devpod.yaml
+  │    └─ tenant agent pod + dev-env
   │
   └─ Workload Container (Application)
-       └─ dev container
+       └─ dev environment
 ```
 
 The system splits responsibility across three distinct layers:
@@ -29,12 +29,12 @@ The system splits responsibility across three distinct layers:
 
 **Today:**
 - Host image build pipeline.
-- Dev pod definition; backup service Quadlet + timer.
+- Tenant agent dev environment image and legacy dev pod fallback; backup service Quadlet + timer.
 - VM build path (qcow2 conversion with SSH key injection).
 - Image push to Quay.
 - GPU CDI plumbing and dynamic boot-time generation.
 - Scheduled local rebuild pipeline (`bootc-update.timer`, `os-builder`, and first-boot push).
-- Multi-tenant Phase 0 + Phase 1 + Phase 2 + Phase 3: `platformctl tenant create | list | inspect | disable | enable | delete | verify-isolation`, `platformctl tunnel set-config | set-credentials | show | list`, `platformctl credential add | list | delete | rotate`, `platformctl grant add | remove | list`, `platformctl audit tail`, `platformctl agent create | list | inspect | start | stop | delete`, `platformctl policy show`, collision-free fallback subuid/subgid allocator, per-tenant non-login service accounts, per-tenant Quadlet rendering, **`openclaw-broker`** daemon (Fernet credential store + grants + audit + admin / per-tenant sockets), **`openclaw-provisioner`** daemon (policy / quota engines + agent Quadlet rendering + systemd integration + audit + admin / per-tenant sockets), real `credential-proxy` container, `openclaw-runtime` ships `agentctl`, Phase-0 stubs for `onboarding-env`. See `concepts/multi_tenant_architecture.md`, `concepts/credential_broker.md`, and `concepts/agent_provisioning.md`.
+- Multi-tenant Phase 0 + Phase 1 + Phase 2 + Phase 3: `platformctl tenant create | list | inspect | disable | enable | delete | verify-isolation`, `platformctl tunnel set-config | set-credentials | show | list`, `platformctl credential add | list | delete | rotate`, `platformctl grant add | remove | list`, `platformctl audit tail`, `platformctl agent create | list | inspect | start | stop | delete`, `platformctl policy show`, collision-free fallback subuid/subgid allocator, per-tenant non-login service accounts, per-tenant Quadlet rendering, **`openclaw-broker`** daemon (Fernet credential store + grants + audit + admin / per-tenant sockets), **`openclaw-provisioner`** daemon (policy / quota engines + agent Quadlet rendering + systemd integration + audit + admin / per-tenant sockets), real `credential-proxy` container, `openclaw-runtime` ships `agentctl`, tenant `dev-env` is the default agent environment, Phase-0 stubs for `onboarding-env`. See `concepts/multi_tenant_architecture.md`, `concepts/credential_broker.md`, and `concepts/agent_provisioning.md`.
 
 **Planned:**
 - Remote/CI rebuild orchestration (planned).

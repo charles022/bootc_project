@@ -1,43 +1,54 @@
-# Staged validation of the dev pod
+# Staged validation of the tenant dev environment
 
 ## Goal
-Validate the GPU dev container in the VM in three explicit stages, peeling back manual steps one at a time so each layer of automation can be verified in isolation.
+Validate GPU development in three explicit stages, peeling back manual steps one at a time so each layer of automation can be verified in isolation.
 
 ## Why staged
 Each stage isolates one new piece of automation. If something breaks at stage 3, you know it isn't the image, the CDI generation, or the Quadlet — it's the workload startup.
 
 ## The three stages
 
-### Stage 1 — manual start, manual job
-- `devpod.kube` ships **without** an `[Install]` section.
-- Pod manifest's container command is `sleep infinity` (a long-running keepalive — see below).
+### Stage 1 — host driver and legacy fallback
+Confirm the host driver and CDI spec are healthy before involving tenant rootless Podman:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl start devpod.service
-sudo podman exec -it devpod-dev-container /bin/bash
-# inside the container:
-./train_smoke.py
+nvidia-smi
+sudo test -r /etc/cdi/nvidia.yaml
+grep -n 'nvidia.com/gpu=all' /etc/cdi/nvidia.yaml
 ```
 
-Confirms the image, CDI plumbing, and pod can run a GPU workload at all.
+While `devpod` is retained, it can also prove the documented `.kube` CDI path:
 
-### Stage 2 — auto start, manual job
-- Add `[Install] WantedBy=multi-user.target` to `devpod.kube`.
-- Manifest still uses `sleep infinity`.
+```bash
+sudo systemctl start devpod.service
+sudo podman exec -it devpod-dev-container nvidia-smi
+```
 
-After reboot, the pod is up. SSH in, `podman exec`, run the smoke test by hand.
+### Stage 2 — tenant agent start, manual job
+Create an agent with the tenant `dev-env` image and confirm the rendered Quadlet requests the GPU:
 
-### Stage 3 — auto start, auto job
-- `[Install]` stays.
-- Replace the container's `sleep infinity` (or the equivalent `tail -f /dev/null` keepalive) with the smoke-test wrapper, so the workload runs as the container's `CMD`.
+```bash
+sudo platformctl agent create alice \
+    --name gpu-test \
+    --runtime quay.io/m0ranmcharles/fedora_init:openclaw-runtime \
+    --environment quay.io/m0ranmcharles/fedora_init:dev-env
+UID_=$(id -u tenant_alice)
+sudo grep -n 'AddDevice=nvidia.com/gpu=all' \
+    /etc/containers/systemd/users/${UID_}/alice-gpu-test-dev-env.container
+sudo machinectl shell tenant_alice@ /usr/bin/podman exec -it alice-gpu-test-dev-env nvidia-smi
+```
 
-Boot is now self-validating.
+This is the rootless CDI validation gate. Do not remove the system dev pod until it passes on NVIDIA hardware.
 
-## The two staging tricks
+### Stage 3 — tenant startup smoke test
+Run the baked-in PyTorch test inside the tenant dev environment:
 
-- **Omitting `[Install]`** keeps the generated `devpod.service` from auto-starting at boot. You can still drive it with `systemctl start` for a manual run. Add `[Install]` only when you want boot-time start.
-- **`sleep infinity` (or `tail -f /dev/null`) as the container command** keeps the pod alive after the smoke test exits, so you can `podman exec` in for manual work. Without it, a one-shot smoke test would exit and the pod would terminate.
+```bash
+sudo machinectl shell tenant_alice@ /usr/bin/podman exec -it alice-gpu-test-dev-env \
+    python3 /workspace/dev_container_test.py
+```
+
+The `dev_container_start.sh` entrypoint also runs this test on container startup and then keeps the container alive with `tail -f /dev/null` so you can enter it for manual work.
 
 ## The smoke test
 

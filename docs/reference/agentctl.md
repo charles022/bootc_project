@@ -63,7 +63,7 @@ If any step fails, the provisioner returns `{"ok": false, "error": "...", "type"
 agentctl create-agent \
     --name rust-coder \
     --runtime  quay.io/m0ranmcharles/fedora_init:openclaw-runtime \
-    --environment quay.io/m0ranmcharles/fedora_init:onboarding-env \
+    --environment quay.io/m0ranmcharles/fedora_init:dev-env \
     --storage shared-code \
     --credential codex \
     --credential github \
@@ -79,7 +79,7 @@ The reply, on success:
     "id": "rust-coder",
     "tenant": "alice",
     "runtime_image": "quay.io/m0ranmcharles/fedora_init:openclaw-runtime",
-    "environment_image": "quay.io/m0ranmcharles/fedora_init:onboarding-env",
+    "environment_image": "quay.io/m0ranmcharles/fedora_init:dev-env",
     "credentials": ["alice/codex/main", "alice/github/main"],
     "volumes": ["shared-code"],
     "ingress": [],

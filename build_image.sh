@@ -12,7 +12,7 @@ REPO="quay.io/m0ranmcharles/fedora_init"
 
 echo "=== Starting Build Process ==="
 
-# 1. Build the dev container image
+# 1. Build the system dev container image.
 echo "Building dev-container..."
 podman build -t "${REPO}:dev-container" -f "${ASSETS_DIR}/dev-container.Containerfile" "${ASSETS_DIR}"
 
@@ -39,6 +39,8 @@ echo "Building credential-proxy (stub)..."
 podman build -t "${REPO}:credential-proxy" -f "${MT_DIR}/credential-proxy.Containerfile" "${MT_DIR}"
 echo "Building onboarding-env (stub)..."
 podman build -t "${REPO}:onboarding-env" -f "${MT_DIR}/onboarding-env.Containerfile" "${MT_DIR}"
+echo "Building dev-env..."
+podman build -t "${REPO}:dev-env" -f "${MT_DIR}/dev-env.Containerfile" "${ASSETS_DIR}"
 
 # Phase 4 messaging-bridge sidecars. Email + Signal are real implementations;
 # WhatsApp ships as a stub container today (webhook ingress is Phase 5).
@@ -64,6 +66,7 @@ echo "  - ${REPO}:os-builder"
 echo "  - ${REPO}:openclaw-runtime         (multi-tenant runtime + Phase-4 router)"
 echo "  - ${REPO}:credential-proxy         (multi-tenant Phase-2)"
 echo "  - ${REPO}:onboarding-env           (multi-tenant Phase-0 stub)"
+echo "  - ${REPO}:dev-env                  (multi-tenant GPU dev environment)"
 echo "  - ${REPO}:messaging-bridge-email   (multi-tenant Phase-4)"
 echo "  - ${REPO}:messaging-bridge-signal  (multi-tenant Phase-4)"
 echo "  - ${REPO}:messaging-bridge-whatsapp (multi-tenant Phase-4 stub)"

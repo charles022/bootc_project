@@ -1,6 +1,6 @@
 # Tenant Quadlets
 
-Quadlet templates and per-tenant placement rules for the multi-tenant layer. These are distinct from the system-wide `devpod.kube` covered by `reference/quadlets.md`.
+Quadlet templates and per-tenant placement rules for the multi-tenant layer. These are distinct from the legacy system-wide `devpod.kube` covered by `reference/quadlets.md`.
 
 ## Where the templates live
 
@@ -165,6 +165,21 @@ A second template family at `/var/lib/openclaw-platform/templates/agent_quadlet/
 The messaging-bridge sidecars share a per-agent host directory at `${PLATFORM_ROOT}/tenants/<tenant>/runtime/agents/<agent>/msgbus/` with the openclaw-runtime container — the bridge writes a UNIX socket there, the runtime connects to it. The provisioner creates and chowns this directory to `tenant_<tenant>` when it processes a request that includes `--messaging`. See `concepts/messaging_interface.md`.
 
 See `concepts/agent_provisioning.md` for the validation pipeline and `how-to/create_an_agent.md` for the operator walkthrough.
+
+### agent-dev-env.container.tmpl
+
+The per-agent dev environment. The default policy points `${ENV_IMAGE}` at `quay.io/m0ranmcharles/fedora_init:dev-env`, while admins may allowlist a different environment image per tenant.
+
+```ini
+[Container]
+Image=${ENV_IMAGE}
+Pod=${TENANT}-${AGENT}.pod
+AddDevice=nvidia.com/gpu=all
+Environment=OPENCLAW_TENANT=${TENANT}
+Environment=OPENCLAW_AGENT=${AGENT}
+```
+
+`AddDevice=nvidia.com/gpu=all` requests the host-generated NVIDIA CDI device from the tenant service account's rootless container. Keep `/etc/cdi/` and `/etc/cdi/nvidia.yaml` readable by tenant service accounts and writable only by root. This rootless CDI path must pass `how-to/validate_gpu.md` on NVIDIA hardware before retiring the legacy `devpod`.
 
 ### tenant-credential-proxy.container.tmpl
 

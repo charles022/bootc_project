@@ -61,7 +61,7 @@ If `main` does not exist yet:
 sudo platformctl agent create alice \
     --name main \
     --runtime quay.io/m0ranmcharles/fedora_init:openclaw-runtime \
-    --environment quay.io/m0ranmcharles/fedora_init:onboarding-env \
+    --environment quay.io/m0ranmcharles/fedora_init:dev-env \
     --is-main \
     --messaging email \
     --credential email

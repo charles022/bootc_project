@@ -152,10 +152,10 @@ sudo systemctl --user --machine=tenant_<tenant>@ restart <tenant>-cloudflared.se
 ## Notes
 
 - `platformctl` does not run as a daemon. It is a one-shot command operators or scripts invoke.
-- `platformctl` only manages **tenant-scoped** Quadlets under `/etc/containers/systemd/users/<UID>/`. The system-wide dev pod under `/usr/share/containers/systemd/devpod.kube` is unrelated and unchanged.
+- `platformctl` manages **tenant-scoped** Quadlets under `/etc/containers/systemd/users/<UID>/`, including agent dev environments. The system-wide dev pod under `/usr/share/containers/systemd/devpod.kube` remains only as a legacy GPU fallback.
 - `platformctl tenant delete` is destructive. It removes the tenant's data on the host. There is currently no backup-before-delete safeguard; back up first using your own snapshot tooling.
 - The fallback subuid/subgid allocator never assigns a range that overlaps an existing entry in `/etc/subuid` or `/etc/subgid`. It walks the file, finds the highest end-of-range, and allocates the next 65536-block past it. The hardcoded `100000-165535` fallback used in Phase 0 was a known bug; Phase 1 replaces it.
-- The agent / credential / backup subcommands still print "planned" messages and exit non-zero so scripts cannot accidentally treat them as success.
+- The backup subcommands still print "planned" messages and exit non-zero so scripts cannot accidentally treat them as success.
 
 ## See also
 

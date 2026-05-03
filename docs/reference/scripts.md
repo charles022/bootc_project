@@ -6,7 +6,7 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 
 ### `build_image.sh`
 - **Path**: `build_image.sh`
-- **Purpose**: Builds the four primary container images (dev-container, backup-container, os-builder, and the bootc host image).
+- **Purpose**: Builds the project images: legacy `dev-container`, tenant `dev-env`, backup-container, os-builder, multi-tenant sidecars, and the host image.
 - **Env vars / args**: None.
 - **Preconditions**: Podman must be installed; build assets must exist in `01_build_image/build_assets/`.
 - **Side effects**: Creates local Podman images tagged for the local registry and Quay.
@@ -90,7 +90,7 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 
 ### `os-builder.sh`
 - **Path**: `/usr/local/bin/os-builder.sh` (source: `01_build_image/build_assets/os-builder.sh`)
-- **Purpose**: Rebuilds all project images from source and exports the host image as an OCI archive.
+- **Purpose**: Rebuilds the host image and selected sibling images from source, including tenant `dev-env`, and exports the host image as an OCI archive.
 - **Env vars / args**: `SOURCE_REPO`, `SOURCE_BRANCH`, `OUTPUT_DIR`, `SAVE_ALL`.
 - **Preconditions**: Run inside the `os-builder` container.
 - **Side effects**: Clones the repository and writes `.tar` image archives to the output directory.
@@ -169,15 +169,15 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 
 ### `dev_container_start.sh`
 - **Path**: `/usr/local/bin/dev_container_start.sh` (source: `01_build_image/build_assets/dev_container_start.sh`)
-- **Purpose**: Serves as the startup entry point for the dev container, running tests before entering a wait loop.
+- **Purpose**: Serves as the startup entry point for the legacy dev container and tenant dev environment, running tests before entering a wait loop.
 - **Env vars / args**: None.
 - **Preconditions**: Run inside the dev container.
 - **Side effects**: Executes `dev_container_test.py` and maintains a persistent process.
-- **Notes**: This is the `CMD` for the dev container.
+- **Notes**: This is the `CMD` for `dev-container` and `dev-env`.
 
 ### `dev_container_test.py`
 - **Path**: `/workspace/dev_container_test.py` (source: `01_build_image/build_assets/dev_container_test.py`)
-- **Purpose**: Validates the Python environment, PyTorch installation, and CUDA visibility inside the dev container.
+- **Purpose**: Validates the Python environment, PyTorch installation, and CUDA visibility inside the legacy dev container or tenant dev environment.
 - **Env vars / args**: None.
 - **Preconditions**: Python 3 and PyTorch must be installed.
 - **Side effects**: Prints diagnostic information about the GPU and torch version.

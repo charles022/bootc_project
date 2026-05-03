@@ -13,15 +13,15 @@ The host image owns anything tied to the machine, hardware, boot order, or platf
 - SSH access (`sshd`) and console autologin recovery.
 - Boot orchestration and timers (`bootc-update.timer`, `bootc-update.service`, `bootc-firstboot-push.service`, `bootc-host-test.service`).
 - GPU driver installation (`nvidia-open`, `nvidia-container-toolkit`) and dynamic CDI generation (`nvidia-cdi-refresh.service`, `nvidia-cdi-refresh.path`).
-- Quadlet definitions baked into `/usr/share/containers/systemd/devpod.kube`.
+- System Quadlet definitions baked into `/usr/share/containers/systemd/` and tenant Quadlet templates rendered under `/etc/containers/systemd/users/<UID>/`.
 
 ### Container ownership
 Containers own their internal workload environments and execution logic. They handle:
-- Workload runtimes, such as the PyTorch/CUDA stack in the dev container.
+- Workload runtimes, such as the PyTorch/CUDA stack in the tenant dev environment.
 - Application code and development tools.
 - The startup behavior defined by their `CMD` or `ENTRYPOINT`. 
 
-Crucially, there is a strict **no in-container systemd** rule. The container command should run the workload, wait, or exit, but it must never run a service manager. The dev container is also reached via `podman exec` from the host rather than its own `sshd` — see `concepts/access_model.md`.
+Crucially, there is a strict **no in-container systemd** rule. The container command should run the workload, wait, or exit, but it must never run a service manager. The tenant dev environment is reached through the tenant pod path rather than its own host-level login — see `concepts/access_model.md`.
 
 #### Exceptions
 
@@ -43,7 +43,7 @@ When adding new behavior, do not ask if it should be a systemd service or a cont
 - If the container owns it, implement it via the container command.
 - If a separate cooperating service owns it, place it in a separate container.
 
-### When to split a process out of the dev container
+### When to split a process out of the dev environment
 
 Move a behavior into its own container when one or more of these are true:
 
@@ -55,19 +55,19 @@ Move a behavior into its own container when one or more of these are true:
 
 Examples of services that would be split out (planned): inference APIs, metrics exporters, reverse proxies.
 
-Periodic *workload* jobs (e.g., scheduled model evaluation, data refresh) belong in their own containerized job — a oneshot pod or a host systemd timer plus a dedicated Quadlet — not crammed into the dev container. Periodic *machine* jobs (snapshot, host health check) belong in host systemd directly.
+Periodic *workload* jobs (e.g., scheduled model evaluation, data refresh) belong in their own containerized job — a oneshot pod or a host systemd timer plus a dedicated Quadlet — not crammed into the dev environment. Periodic *machine* jobs (snapshot, host health check) belong in host systemd directly.
 
-### Long-lived dev container vs. per-job pods
+### Long-lived dev environment vs. per-job pods
 
-The dev pod is deliberately long-lived (`restartPolicy: Always`, container kept alive with `sleep infinity` / `tail -f /dev/null`) and driven interactively from inside via `podman exec`. The alternative — spinning up a fresh pod per job — is rejected for the day-to-day workflow because it adds startup latency and obscures the interactive debugging loop.
+The tenant dev environment is deliberately long-lived (container kept alive with `tail -f /dev/null`) and driven interactively inside the tenant agent pod. The alternative — spinning up a fresh pod per job — is rejected for the day-to-day workflow because it adds startup latency and obscures the interactive debugging loop. The legacy system dev pod follows the same long-lived shape until rootless tenant GPU validation allows it to be retired.
 
 When automated runs are added later, the CDI path does not change. There are two options (planned):
 
-- replace the dev container's startup script with the workload, or
-- add a parallel oneshot pod alongside the dev pod via a second Quadlet.
+- replace the dev environment's startup script with the workload, or
+- add a parallel oneshot pod alongside the agent pod via another Quadlet.
 
 ### Service patterns
-When orchestrating workloads, there is a three-pattern taxonomy: single-app containers, multi-container pods, or user-pods. This project uses a **single-container pod via Quadlet** for the dev pod. The backup service runs as a separate host-managed Quadlet (`backup.container`) activated by `backup.timer`, independent of the dev pod lifecycle. This keeps the development environment isolated from backup failures and allows the host to schedule backups independently of whether the dev pod is active.
+When orchestrating workloads, there is a three-pattern taxonomy: single-app containers, multi-container pods, or user-pods. This project uses tenant agent pods for OpenClaw runtime, dev environment, credential proxy, and optional messaging / ingress sidecars. The backup service runs as a separate host-managed Quadlet (`backup.container`) activated by `backup.timer`, independent of tenant pod lifecycle. This keeps development environments isolated from backup failures and allows the host to schedule backups independently of whether any tenant agent is active.
 
 ### Extension to multiple tenants
 

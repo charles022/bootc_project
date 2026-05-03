@@ -42,7 +42,7 @@ Available commands (one per message):
   help
 
 Examples:
-  create-agent rust-coder quay.io/m0ranmcharles/fedora_init:onboarding-env codex
+  create-agent rust-coder quay.io/m0ranmcharles/fedora_init:dev-env codex
   status main
 """
 

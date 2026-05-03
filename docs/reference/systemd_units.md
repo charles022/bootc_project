@@ -52,6 +52,7 @@ This document catalogs the systemd units authored for this project and the nativ
 - **Triggers**: Activated by `nvidia-cdi-refresh.path` or starts at boot.
 - **Implements**: `nvidia-ctk cdi generate`
 - **Enabled at build time?**: Yes
+- **Notes**: Leaves `/etc/cdi/` mode `0755` and `/etc/cdi/nvidia.yaml` mode `0644` so tenant service accounts can read the CDI spec but only root can replace it.
 
 ### getty@tty1.service drop-in
 - **Path**: `/etc/systemd/system/getty@tty1.service.d/override.conf`

@@ -291,7 +291,7 @@ allowed_images:
   openclaw_runtime:
     - quay.io/m0ranmcharles/fedora_init:openclaw-runtime
   environments:
-    - quay.io/m0ranmcharles/fedora_init:onboarding-env
+    - quay.io/m0ranmcharles/fedora_init:dev-env
 
 allowed_credentials:
   - codex

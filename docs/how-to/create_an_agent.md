@@ -57,7 +57,7 @@ test -S /run/openclaw-provisioner/admin.sock && echo "admin socket OK"
     sudo platformctl agent create alice \
         --name rust-coder \
         --runtime    quay.io/m0ranmcharles/fedora_init:openclaw-runtime \
-        --environment quay.io/m0ranmcharles/fedora_init:onboarding-env \
+        --environment quay.io/m0ranmcharles/fedora_init:dev-env \
         --credential codex \
         --credential github \
         --storage    shared-code \
@@ -87,7 +87,7 @@ agentctl policy-show
 agentctl create-agent \
     --name research-bot \
     --runtime    quay.io/m0ranmcharles/fedora_init:openclaw-runtime \
-    --environment quay.io/m0ranmcharles/fedora_init:onboarding-env \
+    --environment quay.io/m0ranmcharles/fedora_init:dev-env \
     --credential gemini \
     --network    api-only
 

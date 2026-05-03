@@ -6,7 +6,7 @@
 #
 # Inputs:  $SOURCE_REPO, $SOURCE_BRANCH, $OUTPUT_DIR, $SAVE_ALL
 # Outputs: $OUTPUT_DIR/host.tar (always)
-#          $OUTPUT_DIR/{dev,backup,os-builder}.tar  (if SAVE_ALL=1)
+#          $OUTPUT_DIR/{dev-env,backup,os-builder}.tar  (if SAVE_ALL=1)
 #
 # Exit non-zero on any failure so the host orchestrator skips the
 # bootc switch step and leaves the live deployment untouched.
@@ -36,7 +36,7 @@ build_one() {
         "${ASSETS}"
 }
 
-build_one temp-dev        dev-container.Containerfile
+build_one temp-dev-env    multi_tenant/dev-env.Containerfile
 build_one temp-backup     backup-container.Containerfile
 build_one temp-os-builder os-builder.Containerfile
 build_one temp-host       Containerfile
@@ -48,7 +48,7 @@ podman save --format oci-archive -o "${OUTPUT_DIR}/host.tar" temp-host
 
 if [[ "${SAVE_ALL}" == "1" ]]; then
     echo "[os-builder] SAVE_ALL=1: also saving sibling images"
-    podman save --format oci-archive -o "${OUTPUT_DIR}/dev.tar"        temp-dev
+    podman save --format oci-archive -o "${OUTPUT_DIR}/dev-env.tar"    temp-dev-env
     podman save --format oci-archive -o "${OUTPUT_DIR}/backup.tar"     temp-backup
     podman save --format oci-archive -o "${OUTPUT_DIR}/os-builder.tar" temp-os-builder
 fi

@@ -10,12 +10,14 @@ Forks or alternative deployments should use their own Quay namespace and update 
 
 ## Tagging convention
 
-The project maintains four primary tags in the `fedora_init` repository:
+The project maintains these primary tags in the `fedora_init` repository:
 
 - `:latest`: The **host image** (bootable container).
-- `:dev-container`: The **dev container** containing the GPU/PyTorch stack.
+- `:dev-container`: The legacy system **dev container** containing the GPU/PyTorch stack.
+- `:dev-env`: The tenant-scoped agent **dev environment** containing the GPU/PyTorch stack.
 - `:backup-container`: The **host backup service** (currently a placeholder).
 - `:os-builder`: The ephemeral builder image used by the scheduled update pipeline.
+- `:openclaw-runtime`, `:credential-proxy`, `:onboarding-env`, and `:messaging-bridge-*`: Tenant and agent pod images.
 
 ## Authentication
 

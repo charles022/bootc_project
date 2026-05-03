@@ -6,6 +6,8 @@ ConditionPathExists=/usr/bin/nvidia-ctk
 Type=oneshot
 ExecStartPre=/usr/bin/mkdir -p /etc/cdi
 ExecStart=/usr/bin/nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+ExecStartPost=/usr/bin/chmod 0755 /etc/cdi
+ExecStartPost=/usr/bin/chmod 0644 /etc/cdi/nvidia.yaml
 RemainAfterExit=yes
 
 [Install]

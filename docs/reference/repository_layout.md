@@ -24,30 +24,20 @@ A descriptive catalog of the files and directories in this repository.
 ├── build_image.sh
 ├── push_images.sh
 ├── run_container.sh
-├── CLAUDE.md
-├── GEMINI.md
-├── bootc_and_container_build.md
-├── bootc_init_cmd.md
-├── explanaition_of_gpu_integration_path.md
-├── gpu_integration_path.md
-├── immutable_os_deployment_pipeline.md
-├── ostree_architecture.md
-├── ostree_notes.md
-├── pieces_of_design_and_techimplementation.md
-├── process_separation_model.md
-├── quay_repository.md
-└── where_nvidia_belongs.md
+├── AGENTS.md
+├── proposal-gpu-dev-to-tenant.md
+└── legacy root-level notes
 ```
 
 ## Top-level files
 
 | File | Description |
 | :--- | :--- |
-| `build_image.sh` | Orchestrates the multi-stage build of the host image, dev container, and backup service. |
+| `build_image.sh` | Orchestrates the multi-stage build of the host image, workload images, and helper images. |
 | `run_container.sh` | Convenience script for running the host image as a local container for inspection. |
-| `push_images.sh` | Tags and pushes the three project images to Quay. |
-| `CLAUDE.md` | Agent context for Claude Code. Not user-facing documentation. |
-| `GEMINI.md` | Agent context for Gemini. Not user-facing documentation. |
+| `push_images.sh` | Tags and pushes project images to Quay. |
+| `AGENTS.md` | Agent context for coding agents. Not user-facing documentation. |
+| `proposal-gpu-dev-to-tenant.md` | Implementation proposal for moving GPU development into tenant agent pods. |
 | `*.md` (other repo-root) | Pre-rewrite design notes and whiteboards. Canonical content is being migrated into `docs/concepts/`; treat the rewritten docs as authoritative once present. |
 
 ## Directories
@@ -60,7 +50,7 @@ The primary collection of artifacts baked into or used to build the project imag
 
 **Containerfiles**
 - `Containerfile`: Primary definition for the host image.
-- `dev-container.Containerfile`: Definition for the dev container (GPU/PyTorch).
+- `dev-container.Containerfile`: Definition for the legacy system dev container (GPU/PyTorch).
 - `backup-container.Containerfile`: Definition for the host backup service (placeholder).
 - `os-builder.Containerfile`: Definition for the image used in the scheduled update pipeline.
 
@@ -98,6 +88,7 @@ Multi-tenant layer assets (`concepts/multi_tenant_architecture.md`, `concepts/cr
 - `openclaw-provisioner.py` + `openclaw-provisioner.service`: Phase-3+4 host agent-provisioning daemon (policy / quota / grant / messaging validation, agent Quadlet rendering including bridge sidecars, systemd start, audit).
 - `agentctl.py`: Phase-3 tenant-side CLI shipped inside the openclaw-runtime container; carries the `--messaging` flag added in Phase 4.
 - `credential-proxy.py` + `credential-proxy.Containerfile`: Phase-2 pod-local credential proxy sidecar image.
+- `dev-env.Containerfile`: Tenant agent dev environment image using the NVIDIA PyTorch base.
 - `tenant-*.tmpl`: Tenant onboarding-pod Quadlet templates rendered by `platformctl tenant create`.
 - `agent_quadlet/agent-*.tmpl` + `agent_quadlet/agent.pod.tmpl`: Agent-pod Quadlet templates rendered by `openclaw-provisioner` on each `agent_create`. Phase 4 adds three messaging-bridge sidecar templates (`agent-messaging-bridge-{email,signal,whatsapp}.container.tmpl`).
 - `openclaw-runtime.Containerfile` + `openclaw-runtime-router.py`: Agent runtime image. Phase 4 replaces the Phase-0 idle stub with a verb-table message router.

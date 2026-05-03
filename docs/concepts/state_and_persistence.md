@@ -5,13 +5,13 @@
 The system categorizes state into four distinct levels of persistence, depending on whether it belongs to a running process, the workstation environment, the host machine, or off-host storage.
 
 ### Category 1: Transient
-State that lives only inside running containers. This includes Python REPL sessions, scratch tensors, and `/tmp` files within the dev container. This state is intentionally lost on container restart. It requires no persistence policy.
+State that lives only inside running containers. This includes Python REPL sessions, scratch tensors, and `/tmp` files within a tenant dev environment. This state is intentionally lost on container restart. It requires no persistence policy.
 
 ### Category 2: Workstation-environment-persistent
-State that should follow the dev pod environment but is independent of the host OS. Examples: editor settings inside the dev container, dotfiles for the dev pod user. The intent is for this to live in named Podman volumes attached to the dev pod so it survives container restarts. The dev pod manifest does not declare any volumes today, so this category is `(planned)`.
+State that should follow a tenant dev environment but is independent of the host OS. Examples: editor settings, dotfiles, checked-out source trees, and per-agent workspace data. The tenant path stores this under `/var/lib/openclaw-platform/tenants/<tenant>/volumes/` and mounts selected volumes into agent pods.
 
 ### Category 3: Host-persistent
-State owned by the host machine. This includes SSH host keys, the machine ID, cloud-init seed-derived users, anything written to `/etc` after the first boot, and anything in `/var` (such as container storage for the dev container pulled from Quay). This state survives a `bootc upgrade` because of the ostree filesystem model.
+State owned by the host machine. This includes SSH host keys, the machine ID, cloud-init seed-derived users, anything written to `/etc` after the first boot, and anything in `/var` (such as container storage for images pulled from Quay). This state survives a `bootc upgrade` because of the ostree filesystem model.
 
 ### Category 4: Cloud-persistent
 Irreplaceable state that must survive a complete machine wipe. This includes source code, trained models, and datasets. This state lives in remote storage, utilizing cloud backups pushed by the host backup service `(planned)`.

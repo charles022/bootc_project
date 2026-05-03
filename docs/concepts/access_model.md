@@ -55,20 +55,20 @@ See `how-to/distribute_image.md` for more details on building and attaching the 
 | Build + run VM locally | `build_vm.sh` + `run_vm.sh` | Your `~/.ssh/*.pub` (auto) | `ssh fedora-init` |
 | Distribute pre-built binary | Cloud-init NoCloud seed | Recipient's own key | `ssh root@<ip>` |
 
-## Reaching the dev container
+## Reaching tenant environments
 
-Do not bake `sshd` into the dev container; reach it via `podman exec` from the host. Why: it keeps GPU enablement clean and avoids running an in-container init system. See `concepts/ownership_model.md` for the ownership rule this enforces.
+Do not bake host-level SSH access into the tenant dev environment. Tenants reach their own containers through platform-managed entry points such as cloudflared routes, messaging bridges, or an onboarding flow. Admins can still inspect a tenant container from the host with `machinectl shell tenant_<tenant>@` and rootless `podman exec` during validation.
 
 ### Direct-to-container SSH (planned)
 
-A future ergonomics option is to drop specific SSH users straight into the dev container by adding an `sshd_config` block such as:
+A future ergonomics option is to drop specific SSH principals into a tenant container through a controlled host command or tunnel policy. The legacy system dev pod used a direct host `podman exec` shape such as:
 
 ```text
 Match User devuser
     ForceCommand /usr/bin/podman exec -it devpod-dev-container /bin/bash
 ```
 
-This keeps authentication on the host while making `ssh devuser@host` land directly in the container. Not currently configured.
+Tenant access should use tenant-scoped identities and routes instead of host SSH users. Not currently configured.
 
 ## Console autologin recovery fallback
 

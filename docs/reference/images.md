@@ -14,7 +14,7 @@ The primary bootable container image containing the kernel, drivers, and system 
     - **Container Tools**: `podman`, `skopeo`.
     - **Management**: `cloud-init` (first-boot configuration), `openssh-server`.
     - **Update Pipeline**: `bootc-update.*` (systemd units and scripts for weekly rebuilds).
-    - **Orchestration**: Quadlet definitions (`devpod.kube`, `devpod.yaml`) at `/usr/share/containers/systemd/`.
+    - **Orchestration**: Legacy system Quadlet definitions (`devpod.kube`, `devpod.yaml`) at `/usr/share/containers/systemd/` plus tenant and agent Quadlet templates under `/var/lib/openclaw-platform/templates/`.
 - **Tags**:
     - Local: `gpu-bootc-host:latest`
     - Quay: `quay.io/m0ranmcharles/fedora_init:latest`
@@ -23,7 +23,7 @@ The primary bootable container image containing the kernel, drivers, and system 
 
 ## Dev container
 
-The GPU-accelerated development environment where workloads run.
+The legacy system-wide GPU development environment.
 
 - **Path**: `01_build_image/build_assets/dev-container.Containerfile`
 - **Purpose**: Provides a decoupled workstation environment with a full PyTorch and CUDA stack.
@@ -32,6 +32,18 @@ The GPU-accelerated development environment where workloads run.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:dev-container`
 - **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman on the host.
 - **Notes**: Orchestrated by the host's Quadlet as part of the `devpod` pod.
+
+## Dev environment
+
+The tenant-scoped GPU development environment for agent pods.
+
+- **Path**: `01_build_image/build_assets/multi_tenant/dev-env.Containerfile`
+- **Purpose**: Provides a per-agent dev environment with the same PyTorch and CUDA base as the legacy dev container, but rendered through the tenant/agent Quadlet path.
+- **Base image**: `nvcr.io/nvidia/pytorch:26.03-py3`
+- **Key adds**: `bash`, `procps`, `dev_container_start.sh`, and `dev_container_test.py`.
+- **Tags**: `quay.io/m0ranmcharles/fedora_init:dev-env`
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by rootless Podman as part of a tenant agent pod.
+- **Notes**: The default tenant policy allowlists this image for `allowed_images.environments`. The agent dev-env Quadlet requests `AddDevice=nvidia.com/gpu=all`; validate this rootless CDI path on NVIDIA hardware before removing the system-wide `devpod`.
 
 ## Backup service (host)
 

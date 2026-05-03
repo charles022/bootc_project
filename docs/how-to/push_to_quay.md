@@ -1,11 +1,18 @@
 # Push images to Quay
 
 ## Goal
-Push the four project images to the Quay registry:
+Push the project images to the Quay registry:
 - `quay.io/m0ranmcharles/fedora_init:latest` (host image)
 - `quay.io/m0ranmcharles/fedora_init:dev-container`
+- `quay.io/m0ranmcharles/fedora_init:dev-env`
 - `quay.io/m0ranmcharles/fedora_init:backup-container`
 - `quay.io/m0ranmcharles/fedora_init:os-builder`
+- `quay.io/m0ranmcharles/fedora_init:openclaw-runtime`
+- `quay.io/m0ranmcharles/fedora_init:credential-proxy`
+- `quay.io/m0ranmcharles/fedora_init:onboarding-env`
+- `quay.io/m0ranmcharles/fedora_init:messaging-bridge-email`
+- `quay.io/m0ranmcharles/fedora_init:messaging-bridge-signal`
+- `quay.io/m0ranmcharles/fedora_init:messaging-bridge-whatsapp`
 
 ## Prerequisites
 - A Quay.io account (uses Red Hat SSO).
@@ -38,7 +45,9 @@ Quay requires an encrypted password for CLI authentication.
    ```bash
    ./push_images.sh
    ```
-   The script re-tags the local `gpu-bootc-host:latest` and pushes all four images using the `--format v2s2` flag required by bootc.
+   The script re-tags the local `gpu-bootc-host:latest` and pushes all project images using the `--format v2s2` flag required by bootc.
+
+Push `:dev-env` before distributing a host image whose default tenant policy points at `quay.io/m0ranmcharles/fedora_init:dev-env`.
 
 ## Manual fallback
 
@@ -51,9 +60,9 @@ podman push --format v2s2 quay.io/m0ranmcharles/fedora_init:<tag>
 
 ## Verify
 - Observe the script output for the "Push Complete" message.
-- Visit `https://quay.io/repository/m0ranmcharles/fedora_init?tab=tags` and verify that all four tags are present with recent timestamps.
+- Visit `https://quay.io/repository/m0ranmcharles/fedora_init?tab=tags` and verify that the expected tags are present with recent timestamps.
 
 ## Troubleshooting
 - **`podman push: unauthorized`**: Your login session has expired or the `REPO` namespace in `push_images.sh` does not match your account. Re-run `podman login quay.io` and verify the script configuration.
 - **`podman push: blob upload unknown`**: This is typically a transient registry error. The script is restartable; simply run it again.
-- **Slow dev-container push**: The PyTorch base layer is several gigabytes. Subsequent pushes will be faster as only modified layers are uploaded.
+- **Slow dev-container or dev-env push**: The PyTorch base layer is several gigabytes. Subsequent pushes will be faster as only modified layers are uploaded.

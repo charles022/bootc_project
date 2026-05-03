@@ -2,7 +2,7 @@
 
 ## What
 
-The NVIDIA software split spans the host image, a runtime bridge, and the workload container. The host image carries the kernel module and toolkit, the runtime bridge generates dynamic device paths at boot, and the dev container holds the CUDA toolkit and machine learning frameworks.
+The NVIDIA software split spans the host image, a runtime bridge, and the workload container. The host image carries the kernel module and toolkit, the runtime bridge generates dynamic device paths at boot, and the tenant dev environment holds the CUDA toolkit and machine learning frameworks.
 
 ## Why
 
@@ -10,7 +10,7 @@ The load-bearing reason for this split is hardware decoupling. The alternative i
 
 ## Implications
 
-This layered split shapes the project by decoupling updates: the host image updates slowly for OS and driver changes, while the dev pod and its containers can iterate rapidly without modifying the underlying host.
+This layered split shapes the project by decoupling updates: the host image updates slowly for OS and driver changes, while tenant agent pods and their dev environments can iterate rapidly without modifying the underlying host.
 
 ## The stack diagram
 
@@ -20,10 +20,10 @@ bootc host image
   ├─ nvidia-container-toolkit       # CDI generator + runtime bridge (nvidia-ctk)
   ├─ nvidia-cdi-refresh.service     # oneshot: nvidia-ctk cdi generate -> /etc/cdi/nvidia.yaml
   ├─ nvidia-cdi-refresh.path        # re-run the service when /dev/nvidiactl appears
-  ├─ devpod.kube                    # Quadlet that starts the pod at boot
-  └─ devpod.yaml                    # Pod manifest, one persistent dev pod with GPU access
+  ├─ /etc/cdi/nvidia.yaml           # generated CDI spec, root-writable and tenant-readable
+  └─ tenant agent Quadlets          # root-owned templates rendered per tenant service account
 
-workload container (pulled from Quay at pod start)
+tenant dev environment (pulled from Quay at agent start)
   └─ nvcr.io/nvidia/pytorch:26.03-py3   # CUDA + cuDNN + PyTorch
 ```
 
@@ -39,11 +39,19 @@ The CDI specification at `/etc/cdi/nvidia.yaml` maps actual device files and lib
 
 ### Workload containers
 
-The CUDA toolkit, cuDNN, and ML frameworks live entirely inside the dev container (e.g., PyTorch in `nvcr.io/nvidia/pytorch:26.03-py3`). Only the userspace CUDA bits go here. The backup service runs as a separate host Quadlet and does not require GPU tools.
+The CUDA toolkit, cuDNN, and ML frameworks live entirely inside the tenant dev environment (currently `quay.io/m0ranmcharles/fedora_init:dev-env`, built from `nvcr.io/nvidia/pytorch:26.03-py3`). Only the userspace CUDA bits go here. The backup service runs as a separate host Quadlet and does not require GPU tools. The legacy system dev container uses the same base while rootless tenant CDI is validated.
 
-## The Quadlet `.kube` vs. `.container` choice
+## Tenant CDI path and legacy fallback
 
-The dev pod uses a `.kube` Quadlet referencing `devpod.yaml` instead of a `.container` Quadlet. Kubernetes-style pod manifests support requesting GPUs via the documented CDI device selector:
+The tenant agent dev environment is rendered from `agent-dev-env.container.tmpl` as a rootless `.container` Quadlet under `/etc/containers/systemd/users/<UID>/`. It requests the host GPU with:
+
+```ini
+AddDevice=nvidia.com/gpu=all
+```
+
+This keeps GPU development inside the tenant/agent control plane and leaves the onboarding environment lightweight.
+
+The legacy system dev pod still uses a `.kube` Quadlet referencing `devpod.yaml`. Kubernetes-style pod manifests support requesting GPUs via the documented CDI device selector:
 
 ```yaml
 resources:
@@ -53,21 +61,21 @@ resources:
 
 *(See `01_build_image/build_assets/devpod.yaml` in the repo for the authoritative version.)*
 
-Podman's `kube play` formally documents this selector syntax. A standard `.container` Quadlet relies on `AddDevice=`, which accepts direct device paths but lacks an equivalent stable selector mechanism for CDI. The literal equivalent — `AddDevice=nvidia.com/gpu=all` in a `.container` file — may work in practice but is not formally documented for CDI selectors, so we take the documented `.kube` path.
+Podman's `kube play` formally documents this selector syntax. The tenant `.container` path depends on `AddDevice=nvidia.com/gpu=all` working for rootless service accounts with a readable `/etc/cdi/nvidia.yaml`. Keep the legacy `devpod` until `how-to/validate_gpu.md` passes on NVIDIA hardware.
 
 ### Boot-time flow
 
 ```text
-devpod.kube                       # systemd reads this (when to run, deps)
+agent-dev-env.container           # tenant user systemd reads this
     |
     v
 systemd Quadlet generator         # at boot, and on `systemctl daemon-reload`
     |
     v
-podman kube play devpod.yaml      # generated devpod.service runs this
+podman run via Quadlet            # generated <tenant>-<agent>-dev-env.service
     |
     v
-sees nvidia.com/gpu=all in resources.limits
+sees AddDevice=nvidia.com/gpu=all
     |
     v
 reads /etc/cdi/nvidia.yaml        # produced by nvidia-cdi-refresh.service
@@ -88,9 +96,9 @@ The `nvidia-open` package builds the kernel module via DKMS during `dnf install`
 - `akmod-nvidia` (RPM Fusion proprietary) is rejected for the same proprietary-path reason; `akmod-nvidia-open` remains the deferred-build fallback if the in-Containerfile DKMS path proves unreliable.
 - The toolkit/driver split keeps userspace CUDA inside the workload container via `nvidia-container-toolkit` + CDI, rather than exposing CUDA on the host. This avoids tying application lifecycles to the host driver lifecycle.
 
-### CDI selector syntax not validated
+### Rootless CDI selector syntax not validated
 
-The `nvidia.com/gpu=all` resource key in `devpod.yaml` has not been validated end-to-end against current Podman and NVIDIA-toolkit versions. First boot on real GPU hardware is the validation point.
+The `AddDevice=nvidia.com/gpu=all` line in the tenant `.container` Quadlet has not been validated end-to-end against current Podman and NVIDIA-toolkit versions under a tenant service account. First boot on real GPU hardware is the validation point. If rootless CDI fails, keep `devpod` and switch the tenant path to per-agent `.kube` templates or explicit `/dev/nvidia*` mappings after validating library injection.
 
 ## See also
 
