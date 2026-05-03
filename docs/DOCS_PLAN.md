@@ -114,7 +114,7 @@ Single coherent pitch. Sections:
   `gpu_integration_path.md` is the right shape) plus one paragraph each on
   host / container / Quadlet ownership.
 - **What's built today vs. planned** — two short lists. Today: host image
-  builds, dev+backup pod, VM build path, Quay push, GPU CDI plumbing.
+  builds, dev pod + backup service (host Quadlet), VM build path, Quay push, GPU CDI plumbing.
   Planned: scheduled rebuild pipeline, btrfs-based state persistence, cloud
   backup, system wipe-and-restore. Link to `roadmap.md` for the full list.
 - **Where to go next** — three links by role (same as `README.md`'s "by
@@ -233,7 +233,7 @@ These apply to every doc the rewrite produces. Treat them as hard constraints.
      ambiguous).
    - "dev pod" for the `devpod` Quadlet's pod.
    - "dev container" for the GPU/PyTorch container inside the pod.
-   - "backup sidecar" for the placeholder backup container.
+   - "backup service (host)" for the host-managed backup container.
    - "Quay" for the registry, "the registry" only when generic.
 9. **Don't promote CLAUDE.md or GEMINI.md content into docs verbatim.** Those
    are agent-context files. Their content can inform docs, but the docs

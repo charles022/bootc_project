@@ -185,8 +185,8 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 
 ### `backup_stub.sh`
 - **Path**: `/usr/local/bin/backup_stub.sh` (source: `01_build_image/build_assets/backup_stub.sh`)
-- **Purpose**: Acts as a placeholder entry point for the backup sidecar container.
+- **Purpose**: Acts as a placeholder entry point for the host backup service container.
 - **Env vars / args**: None.
-- **Preconditions**: Run inside the backup sidecar container.
-- **Side effects**: Maintains a persistent process to keep the container running.
-- **Notes**: This is the `CMD` for the backup sidecar; real backup logic is planned.
+- **Preconditions**: Run inside the host backup service container.
+- **Side effects**: Emits a log message and exits cleanly.
+- **Notes**: This is the `CMD` for the host backup service; real backup logic is planned.

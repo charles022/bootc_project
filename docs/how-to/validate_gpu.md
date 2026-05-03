@@ -30,7 +30,7 @@ Check the status of the pod service and the pod itself:
 sudo systemctl status devpod.service
 sudo podman pod ps
 ```
-`devpod.service` should be `active (running)`. The pod should contain both the `dev-container` and the `backup-sidecar`.
+`devpod.service` should be `active (running)`. The pod should contain only the `dev-container`.
 
 ### 4. Confirm the dev container sees the GPU
 Run `nvidia-smi` inside the running dev container:

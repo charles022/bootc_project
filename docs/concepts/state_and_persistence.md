@@ -11,10 +11,10 @@ State that lives only inside running containers. This includes Python REPL sessi
 State that should follow the dev pod environment but is independent of the host OS. Examples: editor settings inside the dev container, dotfiles for the dev pod user. The intent is for this to live in named Podman volumes attached to the dev pod so it survives container restarts. The dev pod manifest does not declare any volumes today, so this category is `(planned)`.
 
 ### Category 3: Host-persistent
-State owned by the host machine. This includes SSH host keys, the machine ID, cloud-init seed-derived users, anything written to `/etc` after the first boot, and anything in `/var` (such as container storage for the dev container and the backup sidecar pulled from Quay). This state survives a `bootc upgrade` because of the ostree filesystem model.
+State owned by the host machine. This includes SSH host keys, the machine ID, cloud-init seed-derived users, anything written to `/etc` after the first boot, and anything in `/var` (such as container storage for the dev container pulled from Quay). This state survives a `bootc upgrade` because of the ostree filesystem model.
 
 ### Category 4: Cloud-persistent
-Irreplaceable state that must survive a complete machine wipe. This includes source code, trained models, and datasets. This state lives in remote storage, utilizing cloud backups pushed by the backup sidecar `(planned)`.
+Irreplaceable state that must survive a complete machine wipe. This includes source code, trained models, and datasets. This state lives in remote storage, utilizing cloud backups pushed by the host backup service `(planned)`.
 
 ### The `/etc` versus `/var` discipline
 The bootc host image enforces a strict filesystem model during updates:

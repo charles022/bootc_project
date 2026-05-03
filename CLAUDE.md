@@ -66,9 +66,9 @@ Three layers, built independently, integrated via Quadlet:
    - Base: `nvcr.io/nvidia/pytorch:26.03-py3` (large — this dominates push time).
    - CMD runs `dev_container_start.sh` → `dev_container_test.py` → `tail -f /dev/null` (stays alive for `podman exec`).
 
-3. **Backup sidecar** (`backup-container.Containerfile`) — Fedora 42 base with a placeholder `backup_stub.sh`. Exists only to validate the multi-container pod wiring; no real backup logic yet.
+3. **Backup service** (`backup-container.Containerfile`) — Fedora 42 base; runs as a standalone host Quadlet (`backup.container`) activated by `backup.timer`; no real backup logic yet.
 
-The dev and backup containers run together as a pod defined by `devpod.yaml`, managed by the `devpod.kube` Quadlet. At boot: systemd starts `nvidia-cdi-refresh.service` (generates `/etc/cdi/nvidia.yaml` via `nvidia-ctk cdi generate`) → Quadlet generator turns `devpod.kube` into a `devpod.service` → pod starts with `nvidia.com/gpu=all` GPU access via CDI.
+The dev container runs as a pod defined by `devpod.yaml`, managed by the `devpod.kube` Quadlet. The backup service runs as a separate host Quadlet activated by `backup.timer`. At boot: systemd starts `nvidia-cdi-refresh.service` (generates `/etc/cdi/nvidia.yaml` via `nvidia-ctk cdi generate`) → Quadlet generator turns `devpod.kube` into a `devpod.service` → pod starts with `nvidia.com/gpu=all` GPU access via CDI.
 
 ### Ownership rules (enforced across this codebase)
 
@@ -88,11 +88,11 @@ All three images are tagged under `quay.io/m0ranmcharles/fedora_init` with disti
 
 ## Editing the docs
 
-The structure, terminology, and update contract for `docs/` is defined in **`docs/contributing.md`** — read it before adding, editing, or removing a doc. The reference layer is intentionally code-paired: when you change a Containerfile, systemd unit, Quadlet, or script, update the matching file under `docs/reference/` in the same commit. The terminology contract (`host image`, `dev pod`, `dev container`, `backup sidecar`, `Quay`) is enforced; honor `(planned)` markers when describing aspirational features.
+The structure, terminology, and update contract for `docs/` is defined in **`docs/contributing.md`** — read it before adding, editing, or removing a doc. The reference layer is intentionally code-paired: when you change a Containerfile, systemd unit, Quadlet, or script, update the matching file under `docs/reference/` in the same commit. The terminology contract (`host image`, `dev pod`, `dev container`, `backup service (host)`, `Quay`) is enforced; honor `(planned)` markers when describing aspirational features.
 
 ## Known caveats when editing
 
 - The `nvidia.com/gpu=all: 1` resource key syntax in `devpod.yaml` has not been validated against current Podman/NVIDIA-toolkit versions. First boot on real GPU hardware is the validation.
 - `nvidia-open` uses DKMS to build the kernel module at `dnf install` time, against whatever kernel the bootc base image ships. If `nvidia-smi` fails at boot or `/dev/nvidiactl` never appears, the fallback is either (a) add `kernel-devel` matching the base image's kernel, or (b) swap to RPM Fusion's `akmod-nvidia-open` so the build defers to first boot. See `gpu_integration_path.md`.
-- The pod pulls `dev-container` and `backup-container` images from Quay at boot; there is no preload mechanism, so a freshly booted VM needs network to start the pod.
+- The pod pulls `dev-container` from Quay at pod startup; `backup-container` is pulled when `backup.timer` fires. A freshly booted VM needs network for both.
 - `GEMINI.md` is a parallel project-context file for Gemini; keep it roughly in sync when architecture changes, but don't treat it as canonical over this file.

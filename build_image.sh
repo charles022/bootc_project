@@ -16,7 +16,7 @@ echo "=== Starting Build Process ==="
 echo "Building dev-container..."
 podman build -t "${REPO}:dev-container" -f "${ASSETS_DIR}/dev-container.Containerfile" "${ASSETS_DIR}"
 
-# 2. Build the backup sidecar image
+# 2. Build the backup service image
 echo "Building backup-container..."
 podman build -t "${REPO}:backup-container" -f "${ASSETS_DIR}/backup-container.Containerfile" "${ASSETS_DIR}"
 

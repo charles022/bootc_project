@@ -72,7 +72,7 @@ Hard constraints. PR review will flag violations.
 - **No emojis.**
 - **Terminology contract** — use these terms exactly:
   - **host image** (NOT "bootc image" or "OS image")
-  - **dev pod**, **dev container**, **backup sidecar**
+  - **dev pod**, **dev container**, **backup service (host)**
   - **Quay** for the registry by name; "the registry" only when generic
   - **tenant** (a platform identity backed by a non-login service account; never "user" in the multi-tenant context)
   - **tenant service account** (e.g. `tenant_alice`); never "tenant user" or "guest user"

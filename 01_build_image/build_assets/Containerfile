@@ -65,6 +65,10 @@ RUN chmod 0755 /opt/project/bootc_host_test.sh
 COPY devpod.kube /usr/share/containers/systemd/devpod.kube
 COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 
+# Copy the host-managed backup Quadlet and its activation timer.
+COPY backup.container /usr/share/containers/systemd/backup.container
+COPY backup.timer /usr/lib/systemd/system/backup.timer
+
 # --- Multi-tenant layer (additive) ---
 # See docs/concepts/multi_tenant_architecture.md for the design.
 # The host ships:
@@ -146,4 +150,5 @@ RUN systemctl enable sshd \
     && systemctl enable bootc-update.timer \
     && systemctl enable bootc-firstboot-push.service \
     && systemctl enable openclaw-broker.service \
-    && systemctl enable openclaw-provisioner.service
+    && systemctl enable openclaw-provisioner.service \
+    && systemctl enable backup.timer

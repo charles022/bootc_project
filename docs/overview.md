@@ -14,8 +14,7 @@ Host Image (Hardware & Boot)
   │    └─ devpod.kube / devpod.yaml
   │
   └─ Workload Container (Application)
-       ├─ dev container
-       └─ backup sidecar
+       └─ dev container
 ```
 
 The system splits responsibility across three distinct layers:
@@ -30,7 +29,7 @@ The system splits responsibility across three distinct layers:
 
 **Today:**
 - Host image build pipeline.
-- Dev pod and backup sidecar definitions.
+- Dev pod definition; backup service Quadlet + timer.
 - VM build path (qcow2 conversion with SSH key injection).
 - Image push to Quay.
 - GPU CDI plumbing and dynamic boot-time generation.

@@ -7,7 +7,7 @@ REPO="quay.io/m0ranmcharles/fedora_init"
 
 echo "=== Starting Push Process to Quay.io (using v2s2 format) ==="
 
-# 1. Push the backup sidecar image
+# 1. Push the backup service image
 echo "Pushing backup-container..."
 podman push --format v2s2 "${REPO}:backup-container"
 

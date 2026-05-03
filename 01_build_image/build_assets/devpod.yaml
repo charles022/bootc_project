@@ -1,4 +1,4 @@
-# Define a pod containing the dev container and backup sidecar. # pod manifest header
+# Define a pod containing the dev container. # pod manifest header
 apiVersion: v1 # Kubernetes API version
 kind: Pod # define a pod
 metadata: # begin metadata block
@@ -18,10 +18,3 @@ spec: # begin spec
       resources: # begin resource limits
         limits: # resource limit block
           nvidia.com/gpu=all: 1 # request GPU access through CDI
-
-    # Placeholder backup sidecar used only to validate pod wiring. # backup sidecar entry
-    - name: backup-container # backup container name
-      image: quay.io/m0ranmcharles/fedora_init:backup-container # backup sidecar image reference
-      stdin: true # allow interactive stdin if needed
-      tty: true # allocate tty for inspection
-      workingDir: /workspace # default working directory

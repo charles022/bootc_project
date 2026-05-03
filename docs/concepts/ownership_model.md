@@ -67,7 +67,7 @@ When automated runs are added later, the CDI path does not change. There are two
 - add a parallel oneshot pod alongside the dev pod via a second Quadlet.
 
 ### Service patterns
-When orchestrating workloads, there is a three-pattern taxonomy: single-app containers, multi-container pods, or user-pods. This project uses a **multi-container pod via Quadlet** to group the dev container and the backup sidecar into a single dev pod. This pattern provides a shared lifecycle and network namespace for tightly coupled services while keeping distinct operational roles in independently updatable containers distributed via Quay.
+When orchestrating workloads, there is a three-pattern taxonomy: single-app containers, multi-container pods, or user-pods. This project uses a **single-container pod via Quadlet** for the dev pod. The backup service runs as a separate host-managed Quadlet (`backup.container`) activated by `backup.timer`, independent of the dev pod lifecycle. This keeps the development environment isolated from backup failures and allows the host to schedule backups independently of whether the dev pod is active.
 
 ### Extension to multiple tenants
 

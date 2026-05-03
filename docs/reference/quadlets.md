@@ -42,7 +42,7 @@ The following excerpts are illustrative. See the file in the repo for the author
 Defines the dependencies of the pod.
 ```ini
 [Unit]
-Description=Dev pod with dev container and backup sidecar
+Description=Dev pod (dev container)
 After=network-online.target sshd.service nvidia-cdi-refresh.service
 Wants=network-online.target
 Requires=nvidia-cdi-refresh.service
@@ -105,17 +105,53 @@ The primary workload environment.
 * **stdin/tty:** Allows for interactive sessions via `podman exec`.
 * **resources.limits:** Uses the CDI selector `nvidia.com/gpu=all` to request access to the host's NVIDIA GPU.
 
-#### Containers: backup-container
-A placeholder sidecar used for validating pod wiring and persistence.
-```yaml
-    - name: backup-container
-      image: quay.io/m0ranmcharles/fedora_init:backup-container
-      stdin: true
-      tty: true
-      workingDir: /workspace
-```
-* This container runs alongside the **dev container** in the same network and IPC namespace.
-
 ### Keepalive in the container command
 
 The dev container's startup script ends with `tail -f /dev/null` (the equivalent of `sleep infinity`) so the container stays alive after the smoke test exits and remains reachable via `podman exec`. Without it, the pod would terminate as soon as the smoke test returned, and `restartPolicy: Always` would loop it.
+
+---
+
+## backup.container + backup.timer
+
+The backup service is a host-managed Quadlet — independent of the dev pod. It runs on a schedule via a systemd timer and exits cleanly when its task completes, rather than staying alive as a sidecar.
+
+### backup.container
+
+* **Path in repo:** `01_build_image/build_assets/backup.container`
+* **Path in host image:** `/usr/share/containers/systemd/backup.container`
+* **Type:** Standalone `.container` Quadlet unit.
+* **Generated systemd unit:** `backup.service`.
+
+```ini
+[Unit]
+Description=Host-managed data backup service
+
+[Container]
+Image=quay.io/m0ranmcharles/fedora_init:backup-container
+Volume=/var/lib/openclaw-platform:/var/lib/openclaw-platform:ro
+Exec=/usr/local/bin/backup_stub.sh
+```
+
+* No `[Install]` section — this unit is activated only by `backup.timer`, not directly at boot.
+* The volume mount gives the backup container read-only access to platform state without exposing it to the dev pod.
+
+### backup.timer
+
+* **Path in repo:** `01_build_image/build_assets/backup.timer`
+* **Path in host image:** `/usr/lib/systemd/system/backup.timer`
+* **Enabled at:** `timers.target` (activated at boot via `systemctl enable backup.timer`).
+
+```ini
+[Unit]
+Description=Daily backup trigger
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+* `Persistent=true` catches up a missed run if the host was powered off at the scheduled time.
+* Only `backup.timer` is enabled; `backup.service` is activated on demand by the timer, not at every boot.

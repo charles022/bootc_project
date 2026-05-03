@@ -20,7 +20,7 @@ This project, titled "Bootc System Migration," focuses on moving from a traditio
 ## Building and Running
 
 ### Build Flow
-The build process involves three layers: the dev container, the backup sidecar, and finally the bootc host image that integrates them.
+The build process involves three layers: the dev container, the backup service (a standalone host Quadlet, not a pod sidecar), and finally the bootc host image that integrates them.
 
 - **Build Images**:
   ```bash

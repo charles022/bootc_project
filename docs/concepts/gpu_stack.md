@@ -39,7 +39,7 @@ The CDI specification at `/etc/cdi/nvidia.yaml` maps actual device files and lib
 
 ### Workload containers
 
-The CUDA toolkit, cuDNN, and ML frameworks live entirely inside the dev container (e.g., PyTorch in `nvcr.io/nvidia/pytorch:26.03-py3`). Only the userspace CUDA bits go here. The backup sidecar runs alongside it but does not require GPU tools.
+The CUDA toolkit, cuDNN, and ML frameworks live entirely inside the dev container (e.g., PyTorch in `nvcr.io/nvidia/pytorch:26.03-py3`). Only the userspace CUDA bits go here. The backup service runs as a separate host Quadlet and does not require GPU tools.
 
 ## The Quadlet `.kube` vs. `.container` choice
 

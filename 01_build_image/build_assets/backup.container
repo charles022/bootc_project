@@ -1,0 +1,7 @@
+[Unit]
+Description=Host-managed data backup service
+
+[Container]
+Image=quay.io/m0ranmcharles/fedora_init:backup-container
+Volume=/var/lib/openclaw-platform:/var/lib/openclaw-platform:ro
+Exec=/usr/local/bin/backup_stub.sh

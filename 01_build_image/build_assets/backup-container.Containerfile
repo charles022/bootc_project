@@ -1,7 +1,7 @@
-# Use a small Fedora base for the backup sidecar.
+# Use a small Fedora base for the host backup service.
 FROM registry.fedoraproject.org/fedora:42
 
-# Install only the minimal tools needed for the placeholder sidecar.
+# Install only the minimal tools needed for the placeholder backup service.
 RUN dnf -y install \
     bash \
     coreutils \

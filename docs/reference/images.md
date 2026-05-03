@@ -33,16 +33,16 @@ The GPU-accelerated development environment where workloads run.
 - **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman on the host.
 - **Notes**: Orchestrated by the host's Quadlet as part of the `devpod` pod.
 
-## Backup sidecar
+## Backup service (host)
 
-A placeholder service for managing persistent data backups.
+A placeholder container for host-managed data backups.
 
 - **Path**: `01_build_image/build_assets/backup-container.Containerfile`
-- **Purpose**: Designed to run alongside the dev container to handle state persistence and cloud sync (planned).
+- **Purpose**: Runs as a standalone host Quadlet (`backup.container`) activated by `backup.timer` to handle state persistence and cloud sync (planned). Isolated from the dev pod.
 - **Base image**: `registry.fedoraproject.org/fedora:42`
 - **Key adds**: `bash`, `coreutils`.
 - **Tags**: `quay.io/m0ranmcharles/fedora_init:backup-container`
-- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman on the host.
+- **Baked-in vs. pulled at runtime**: Pulled at runtime by Podman on the host when `backup.timer` fires.
 
 ## OS builder
 

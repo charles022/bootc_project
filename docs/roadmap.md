@@ -2,7 +2,7 @@
 
 ## Built today
 - host image build
-- dev pod & backup sidecar definition
+- dev pod & backup service (host Quadlet + timer)
 - GPU CDI plumbing (`nvidia-cdi-refresh.{service,path}`)
 - Quadlet at `/usr/share/containers/systemd/`
 - qcow2 build path with key injection

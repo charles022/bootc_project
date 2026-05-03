@@ -14,7 +14,7 @@ The project maintains four primary tags in the `fedora_init` repository:
 
 - `:latest`: The **host image** (bootable container).
 - `:dev-container`: The **dev container** containing the GPU/PyTorch stack.
-- `:backup-container`: The **backup sidecar** (currently a placeholder).
+- `:backup-container`: The **host backup service** (currently a placeholder).
 - `:os-builder`: The ephemeral builder image used by the scheduled update pipeline.
 
 ## Authentication

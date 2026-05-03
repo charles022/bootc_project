@@ -1,6 +1,6 @@
-# Define the Quadlet-managed pod that contains the dev and backup containers.
+# Define the Quadlet-managed pod that contains the dev container.
 [Unit]
-Description=Dev pod with dev container and backup sidecar
+Description=Dev pod (dev container)
 After=network-online.target sshd.service nvidia-cdi-refresh.service
 Wants=network-online.target
 Requires=nvidia-cdi-refresh.service

@@ -8,7 +8,7 @@ Before adding, editing, removing, or reorganizing documentation, read `docs/cont
 
 ## Build, Test, and Development Commands
 
-- `./build_image.sh`: builds the dev container, backup sidecar, os-builder image, and host image.
+- `./build_image.sh`: builds the dev container, backup service, os-builder image, and host image.
 - `./run_container.sh [IMAGE]`: opens an ephemeral shell in the host image for inspection; it does not run systemd.
 - `./02_build_vm/build_vm.sh [IMAGE]`: converts the host image to qcow2 and injects the local SSH public key.
 - `./02_build_vm/run_vm.sh`: boots the VM and writes/updates the `ssh fedora-init` alias.

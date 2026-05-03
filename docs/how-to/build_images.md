@@ -1,7 +1,7 @@
 # Build images
 
 ## Goal
-Build the host image, dev container, backup sidecar, and os-builder images on a local workstation.
+Build the host image, dev container, backup service, and os-builder images on a local workstation.
 
 ## Prerequisites
 - Podman installed and rootless builds functional (run `podman info` to confirm).
@@ -28,7 +28,7 @@ Confirm the images exist in local storage:
 ```bash
 podman images | grep -E 'fedora_init|gpu-bootc-host'
 ```
-The output should list four distinct image entries: the host image, the dev container, the backup sidecar, and the os-builder.
+The output should list four distinct image entries: the host image, the dev container, the backup service, and the os-builder.
 
 ## Troubleshooting
 - **Network unreachable pulling NVIDIA base**: The NVIDIA Container Registry (`nvcr.io`) may occasionally rate-limit requests. Retry the build, or run `podman login nvcr.io` if you have specific credentials.

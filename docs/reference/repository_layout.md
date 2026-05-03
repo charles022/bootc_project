@@ -43,7 +43,7 @@ A descriptive catalog of the files and directories in this repository.
 
 | File | Description |
 | :--- | :--- |
-| `build_image.sh` | Orchestrates the multi-stage build of the host image, dev container, and backup sidecar. |
+| `build_image.sh` | Orchestrates the multi-stage build of the host image, dev container, and backup service. |
 | `run_container.sh` | Convenience script for running the host image as a local container for inspection. |
 | `push_images.sh` | Tags and pushes the three project images to Quay. |
 | `CLAUDE.md` | Agent context for Claude Code. Not user-facing documentation. |
@@ -61,7 +61,7 @@ The primary collection of artifacts baked into or used to build the project imag
 **Containerfiles**
 - `Containerfile`: Primary definition for the host image.
 - `dev-container.Containerfile`: Definition for the dev container (GPU/PyTorch).
-- `backup-container.Containerfile`: Definition for the placeholder backup sidecar.
+- `backup-container.Containerfile`: Definition for the host backup service (placeholder).
 - `os-builder.Containerfile`: Definition for the image used in the scheduled update pipeline.
 
 **Systemd units**
@@ -75,9 +75,11 @@ The primary collection of artifacts baked into or used to build the project imag
 **Pod & Quadlet definitions**
 - `devpod.kube`: Quadlet file defining the systemd-managed pod.
 - `devpod.yaml`: Kubernetes Pod specification for the dev pod.
+- `backup.container`: Standalone Quadlet unit for the host backup service (activated by `backup.timer`).
+- `backup.timer`: Systemd timer that fires `backup.service` on a daily schedule.
 
 **Scripts**
-- `backup_stub.sh`: Placeholder logic for the backup sidecar.
+- `backup_stub.sh`: Placeholder entry point for the host backup service.
 - `bootc_host_test.sh`: Execution logic for host-level tests.
 - `bootc-firstboot-push.sh`: Implementation of the first-boot push to Quay.
 - `bootc-update-nudge.sh`: Script to notify the user of pending updates.
