@@ -149,18 +149,37 @@ Modeled directly on `credential-proxy.py` /
 
 ### 4. GPU Coexistence
 
-The dev pod (`devpod.yaml`) currently requests `nvidia.com/gpu=all`. vLLM
-will hold a large slab of VRAM for its KV cache. We must decide explicitly:
+The legacy dev pod (`devpod.yaml`) currently requests `nvidia.com/gpu=all`,
+and every provisioned tenant agent dev environment does the same through
+`01_build_image/build_assets/multi_tenant/agent_quadlet/agent-dev-env.container.tmpl`.
+vLLM will hold a large slab of VRAM for its KV cache, so GPU arbitration has
+to cover both host-level developer services and rootless per-tenant agent
+containers. `Conflicts=devpod.service` only handles the legacy dev pod; it
+does not stop already-running or newly-provisioned tenant agent dev
+environments from competing with vLLM.
 
-- **Option (a) — coexist:** set `gpu_memory_utilization` low enough to
-  leave headroom, document the split, accept that the dev pod may OOM under
-  load.
-- **Option (b) — mutually exclude:** add `Conflicts=devpod.service` to the
-  vLLM unit (or vice-versa) so only one is active at a time.
+We must decide explicitly at policy/admission time:
 
-Recommendation: **(b) for the workstation deployment** while there is a
-single GPU. Revisit when MIG or a second GPU is in play. Either way the
-choice should be made in the unit file, not left implicit.
+- **Option (a) — shared contention:** set `gpu_memory_utilization` low enough
+  to leave documented headroom, keep tenant agent dev environments on
+  `nvidia.com/gpu=all`, and accept that vLLM or tenant workloads may OOM or
+  experience latency spikes under load.
+- **Option (b) — vLLM-exclusive GPU mode:** when vLLM mode is active, add
+  `Conflicts=devpod.service` for the legacy dev pod **and** render or admit
+  tenant agent dev environments without `--device=nvidia.com/gpu=all` unless
+  a specific per-agent GPU admission policy grants access.
+- **Option (c) — per-agent GPU admission:** extend tenant policy with an
+  explicit GPU mode, such as `gpu_mode: vllm-exclusive | shared |
+  per-agent`, plus per-agent grants. `validate_create_request` should reject
+  requests that would create GPU-enabled agent environments while the node is
+  in vLLM-exclusive mode.
+
+Recommendation: **Option (b) for the single-GPU workstation deployment**,
+implemented as a policy-controlled `gpu_mode` defaulting to
+`vllm-exclusive` whenever host vLLM is enabled. Revisit shared or per-agent
+admission when MIG or a second GPU is in play. Either way, the choice must be
+made in policy and unit/template rendering, not left implicit in only the
+vLLM unit file.
 
 ## Implementation Steps
 
@@ -168,7 +187,8 @@ choice should be made in the unit file, not left implicit.
    `01_build_image/build_assets/` and `COPY` it into
    `/usr/share/containers/systemd/` from
    `01_build_image/build_assets/Containerfile`. Decide GPU coexistence
-   (`Conflicts=` with `devpod.service` is the recommended default). No
+   (`Conflicts=` with `devpod.service` is necessary but not sufficient;
+   policy must also govern GPU-enabled tenant agent dev environments). No
    `vllm.network` Quadlet — vLLM is exposed through the host-owned
    `/run/openclaw-llm/vllm.sock` UDS instead of TCP.
 2. **`llm-proxy` image and template.** Add
@@ -180,9 +200,14 @@ choice should be made in the unit file, not left implicit.
    `01_build_image/build_assets/multi_tenant/openclaw-provisioner.py`:
    - Render the new template into each agent pod (the existing
      `render_agent_quadlets` loop at line 390 already iterates `*.tmpl`).
-   - Extend `DEFAULT_POLICY` (line ~228) with `allowed_models` and
-     `llm_token_budget` keys, defaulting to a conservative empty/zero so
-     LLM access is opt-in per tenant.
+   - Extend `DEFAULT_POLICY` (line ~228) with `allowed_models`,
+     `llm_token_budget`, and `gpu_mode` keys, defaulting to conservative
+     values so LLM access is opt-in per tenant and GPU-enabled agent dev
+     environments cannot silently contend with host vLLM.
+   - Wire `gpu_mode` into `validate_create_request` and agent Quadlet
+     rendering so vLLM-exclusive mode rejects or strips
+     `--device=nvidia.com/gpu=all` from tenant agent dev environments unless
+     policy grants per-agent GPU access.
    - **Do not** add a new entry to `ALLOWED_NETWORKS_DEFAULT`
      (`openclaw-provisioner.py:67`); LLM access is socket-mediated, not
      network-mediated.
