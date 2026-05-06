@@ -109,11 +109,13 @@ A `vllm.container` Quadlet runs on the host as a system service, alongside
 ### 2. The Per-Tenant `llm-proxy` Sidecar
 
 Modeled directly on `credential-proxy.py` /
-`tenant-credential-proxy.container.tmpl`.
+`agent-credential-proxy.container.tmpl`.
 
-- **New template:** `tenant-llm-proxy.container.tmpl` rendered by
-  `openclaw-provisioner.py` into each tenant pod, the same way
-  `credential-proxy` already is.
+- **New template:** `agent-llm-proxy.container.tmpl` lives under
+  `01_build_image/build_assets/multi_tenant/agent_quadlet/` and is rendered
+  by `openclaw-provisioner.py` with the agent Quadlet templates. The
+  provisioner derives agent output names by stripping the `agent-` prefix, so
+  this sidecar must not use the `tenant-*` onboarding-template naming pattern.
 - **Listens** on a UNIX socket inside the pod, e.g. `/run/llm/llm.sock`,
   bind-mounted into the agent runtime container — the same idiom as
   `agentctl.sock` at
@@ -194,8 +196,10 @@ vLLM unit file.
 2. **`llm-proxy` image and template.** Add
    `01_build_image/build_assets/multi_tenant/llm-proxy.Containerfile` and
    `llm-proxy.py`, mirroring the structure of `credential-proxy.*`. Add
-   `tenant-llm-proxy.container.tmpl` under
-   `01_build_image/build_assets/multi_tenant/agent_quadlet/`.
+   `agent-llm-proxy.container.tmpl` under
+   `01_build_image/build_assets/multi_tenant/agent_quadlet/` so it renders
+   with each agent pod; `tenant-*` templates remain for tenant onboarding
+   pods.
 3. **Provisioner wiring.** In
    `01_build_image/build_assets/multi_tenant/openclaw-provisioner.py`:
    - Render the new template into each agent pod (the existing
