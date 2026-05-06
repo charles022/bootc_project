@@ -95,10 +95,9 @@ A `vllm.container` Quadlet runs on the host as a system service, alongside
 
 - **GPU access:** CDI (`--device nvidia.com/gpu=all`), consistent with
   `nvidia-cdi-refresh.service` generating `/etc/cdi/nvidia.yaml` at boot.
-- **Binding:** Listens on `127.0.0.1:8000` in the **host root netns only**.
-  No Podman network is shared with tenants. No port is published. If vLLM's
-  OpenAI server gains UNIX-socket support, prefer that; loopback HTTP is
-  the safe default today.
+- **Binding:** Listens on a host-owned Unix domain socket, preferably
+  `/run/openclaw-llm/vllm.sock`, via `vllm serve --uds`. No Podman network is
+  shared with tenants and no TCP port is published.
 - **Resource tuning:** `gpu_memory_utilization` set so the GPU isn't fully
   consumed at load time — see "GPU coexistence" below.
 - **Model and cache externalised:** model name and HuggingFace cache path
@@ -119,8 +118,10 @@ Modeled directly on `credential-proxy.py` /
   bind-mounted into the agent runtime container — the same idiom as
   `agentctl.sock` at
   `agent-openclaw-runtime.container.tmpl:20`.
-- **Forwards** to vLLM's loopback endpoint. Only the proxy container has
-  that egress path; the agent runtime has no network route to vLLM at all.
+- **Forwards** to the host vLLM socket by bind-mounting only
+  `/run/openclaw-llm/vllm.sock` read-only into the proxy container. The tenant
+  pod does not receive host networking or L3 reachability to host loopback;
+  the agent runtime still has no network route to vLLM at all.
 - **Enforces, per request:**
   - tenant-id tagging,
   - per-tenant token-rate / concurrent-request quotas, sourced from
@@ -168,7 +169,8 @@ choice should be made in the unit file, not left implicit.
    `/usr/share/containers/systemd/` from
    `01_build_image/build_assets/Containerfile`. Decide GPU coexistence
    (`Conflicts=` with `devpod.service` is the recommended default). No
-   `vllm.network` Quadlet — vLLM stays on host loopback.
+   `vllm.network` Quadlet — vLLM is exposed through the host-owned
+   `/run/openclaw-llm/vllm.sock` UDS instead of TCP.
 2. **`llm-proxy` image and template.** Add
    `01_build_image/build_assets/multi_tenant/llm-proxy.Containerfile` and
    `llm-proxy.py`, mirroring the structure of `credential-proxy.*`. Add
@@ -197,8 +199,6 @@ choice should be made in the unit file, not left implicit.
 
 ## Open Questions
 
-- **vLLM UNIX-socket support.** If the OpenAI-compatible server gains
-  native UNIX-socket binding, drop loopback HTTP entirely.
 - **Streaming and cancellation.** The proxy must forward SSE cleanly and
   propagate client-side disconnects so a tenant cancelling a long
   generation actually frees vLLM scheduler slots. Worth a smoke test
