@@ -64,8 +64,24 @@ STATE_FILE = PROV_DIR / "STATE"
 
 SO_PEERCRED = getattr(socket, "SO_PEERCRED", 17)
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
-ALLOWED_NETWORKS_DEFAULT = ["none", "messaging-only", "api-only", "restricted-internet"]
+ALLOWED_NETWORKS_DEFAULT = [
+    "none",
+    "messaging-only",
+    "api-only",
+    "restricted-internet",
+    # Pod is attached to vllm-internal so the agent runtime can reach the
+    # shared vLLM service. No public egress, no other tenants reachable.
+    "vllm-only",
+    # vllm-internal plus the messaging-bridge sidecars (still no public egress).
+    "vllm+messaging",
+]
 ALLOWED_MESSAGING_DEFAULT = ["email", "signal", "whatsapp"]
+ALLOWED_CREDENTIALS_DEFAULT = [
+    "codex", "gemini", "claude", "email", "signal", "github",
+    # Shared vLLM API key. The broker stores per-tenant copies; agents
+    # fetch via credential-proxy. See docs/concepts/inference_stack.md.
+    "vllm",
+]
 
 
 def now_iso():
@@ -237,9 +253,7 @@ DEFAULT_POLICY = {
             "quay.io/m0ranmcharles/fedora_init:dev-env",
         ],
     },
-    "allowed_credentials": [
-        "codex", "gemini", "claude", "email", "signal", "github",
-    ],
+    "allowed_credentials": list(ALLOWED_CREDENTIALS_DEFAULT),
     "allowed_networks": list(ALLOWED_NETWORKS_DEFAULT),
     "allowed_messaging": list(ALLOWED_MESSAGING_DEFAULT),
     "default_network": "restricted-internet",

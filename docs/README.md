@@ -36,6 +36,7 @@
 - [concepts/bootc_and_ostree.md](concepts/bootc_and_ostree.md) — How bootc and OSTree provide an immutable, versioned filesystem for the host OS.
 - [concepts/credential_broker.md](concepts/credential_broker.md) — Tenant credential ownership, encrypted store, scoped grants, audit log, wire protocol.
 - [concepts/gpu_stack.md](concepts/gpu_stack.md) — Architectural split of NVIDIA drivers, toolkit, and CDI across host and container layers.
+- [concepts/inference_stack.md](concepts/inference_stack.md) — Shared vLLM inference service: network/auth/process isolation, threat model, tenant access via the broker.
 - [concepts/messaging_interface.md](concepts/messaging_interface.md) — Phase-4 messaging-bridge sidecars, runtime verb-table router, sender allow-listing.
 - [concepts/multi_tenant_architecture.md](concepts/multi_tenant_architecture.md) — Multi-tenant rootless-Podman platform: per-tenant non-login service accounts, host control plane, OpenClaw agent pods.
 - [concepts/ownership_model.md](concepts/ownership_model.md) — The 3-layer division of responsibility between the host, containers, and Quadlets.
@@ -57,6 +58,7 @@
 - [reference/scripts.md](reference/scripts.md) — Reference catalog of the shell and Python scripts for building and maintaining the system.
 - [reference/systemd_units.md](reference/systemd_units.md) — Catalog of project-specific systemd units and native host services enabled in the image.
 - [reference/tenant_quadlets.md](reference/tenant_quadlets.md) — Tenant-pod Quadlet templates and per-UID placement under `/etc/containers/systemd/users/`.
+- [reference/vllm_quadlet.md](reference/vllm_quadlet.md) — Shared vLLM service Quadlets, bootstrap unit, and runtime env file.
 
 ### How-to
 - [how-to/build_and_run_vm.md](how-to/build_and_run_vm.md) — Procedure for converting the image to qcow2 and booting it with libvirt.

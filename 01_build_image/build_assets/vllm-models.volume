@@ -1,0 +1,13 @@
+# Named podman volume for the vLLM HuggingFace model cache.
+# Persists across container restarts and host reboots so that model
+# weights are downloaded only once. Owned by root; vLLM runs as root in
+# the container by default. See docs/reference/vllm_quadlet.md.
+
+[Unit]
+Description=Persistent volume for vLLM model cache
+
+[Volume]
+VolumeName=vllm-models
+
+[Install]
+WantedBy=multi-user.target

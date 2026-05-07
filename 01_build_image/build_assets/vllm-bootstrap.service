@@ -1,0 +1,23 @@
+# vllm-bootstrap.service — generate /etc/openclaw-platform/vllm.env on first
+# boot if it is missing. The env file holds the shared vLLM API key and
+# tunables (model name, max-num-seqs, GPU memory fraction). Operators may
+# replace the file by hand or via cloud-init; the bootstrap only acts when
+# the file is absent.
+#
+# Companion of vllm.container — vllm.container has Requires= on this unit,
+# so vLLM never starts with an empty key.
+
+[Unit]
+Description=Generate vLLM API key and defaults if missing
+ConditionPathExists=!/etc/openclaw-platform/vllm.env
+DefaultDependencies=no
+After=local-fs.target
+Before=vllm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vllm-bootstrap.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

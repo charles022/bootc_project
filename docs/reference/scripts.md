@@ -80,6 +80,14 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Side effects**: Prints a notification message to stdout during shell login.
 - **Notes**: Part of the host image's update UX.
 
+### `vllm-bootstrap.sh`
+- **Path**: `/usr/local/bin/vllm-bootstrap.sh` (source: `01_build_image/build_assets/vllm-bootstrap.sh`)
+- **Purpose**: Generates `/etc/openclaw-platform/vllm.env` with a fresh API key and inference defaults the first time the host boots.
+- **Env vars / args**: None.
+- **Preconditions**: Run as root by `vllm-bootstrap.service` before `vllm.service` starts.
+- **Side effects**: Writes a 0600 root:root env file (`VLLM_IMAGE`, `VLLM_MODEL`, `VLLM_MAX_NUM_SEQS`, `VLLM_GPU_MEMORY_UTILIZATION`, `VLLM_API_KEY`); no-op if the file already exists.
+- **Notes**: The shared vLLM API key is created here. See `concepts/inference_stack.md` and `reference/vllm_quadlet.md`.
+
 ### `bootc_host_test.sh`
 - **Path**: `/opt/project/bootc_host_test.sh` (source: `01_build_image/build_assets/bootc_host_test.sh`)
 - **Purpose**: Performs a basic smoke test of host services, GPU/CDI state, and Quadlet status at boot.

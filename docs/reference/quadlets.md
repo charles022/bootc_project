@@ -155,3 +155,16 @@ WantedBy=timers.target
 
 * `Persistent=true` catches up a missed run if the host was powered off at the scheduled time.
 * Only `backup.timer` is enabled; `backup.service` is activated on demand by the timer, not at every boot.
+
+---
+
+## vllm.container + vllm-internal.network + vllm-models.volume
+
+The shared vLLM inference service. Three Quadlet files (network, volume, container) plus a oneshot bootstrap unit. Full details in `reference/vllm_quadlet.md` and the design in `concepts/inference_stack.md`.
+
+* **Paths in repo:** `01_build_image/build_assets/vllm.container`, `vllm-internal.network`, `vllm-models.volume`
+* **Paths in host image:** `/usr/share/containers/systemd/{vllm.container,vllm-internal.network,vllm-models.volume}`
+* **Generated systemd units:** `vllm.service`, `vllm-internal-network.service`, `vllm-models-volume.service`
+* **Network:** `Internal=true` — vLLM is reachable only from pods attached to `vllm-internal`.
+* **Auth:** vLLM is launched with `--api-key ${VLLM_API_KEY}` from `/etc/openclaw-platform/vllm.env`. Per-tenant grants flow through `openclaw-broker`.
+* **Hardening:** `ReadOnly=true`, `NoNewPrivileges=true`, `DropCapability=ALL`, tmpfs `/tmp` and `/dev/shm`.

@@ -69,6 +69,18 @@ COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 COPY backup.container /usr/share/containers/systemd/backup.container
 COPY backup.timer /usr/lib/systemd/system/backup.timer
 
+# --- Shared vLLM inference service ---
+# A single host-managed vLLM instance serves every tenant agent. Tenants
+# reach it on the internal `vllm-internal` podman network and authenticate
+# with a key brokered through openclaw-broker / credential-proxy.
+# See docs/concepts/inference_stack.md.
+COPY vllm-internal.network /usr/share/containers/systemd/vllm-internal.network
+COPY vllm-models.volume    /usr/share/containers/systemd/vllm-models.volume
+COPY vllm.container        /usr/share/containers/systemd/vllm.container
+COPY vllm-bootstrap.service /usr/lib/systemd/system/vllm-bootstrap.service
+COPY vllm-bootstrap.sh     /usr/local/bin/vllm-bootstrap.sh
+RUN chmod 0755 /usr/local/bin/vllm-bootstrap.sh
+
 # --- Multi-tenant layer (additive) ---
 # See docs/concepts/multi_tenant_architecture.md for the design.
 # The host ships:
@@ -151,4 +163,5 @@ RUN systemctl enable sshd \
     && systemctl enable bootc-firstboot-push.service \
     && systemctl enable openclaw-broker.service \
     && systemctl enable openclaw-provisioner.service \
-    && systemctl enable backup.timer
+    && systemctl enable backup.timer \
+    && systemctl enable vllm-bootstrap.service

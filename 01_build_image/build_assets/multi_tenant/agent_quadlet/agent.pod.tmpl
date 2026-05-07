@@ -1,12 +1,19 @@
 # Agent pod for ${TENANT}/${AGENT}.
 # Rendered by openclaw-provisioner.service. See docs/concepts/agent_provisioning.md.
+#
+# The pod is attached to vllm-internal so its agent runtime can reach the
+# shared vLLM service at http://vllm:8000. Network attachment alone grants
+# nothing — the runtime cannot authenticate to vLLM unless the broker has
+# issued a `vllm` credential grant for this agent. See
+# docs/concepts/inference_stack.md for the full threat model.
 [Unit]
 Description=OpenClaw agent pod ${TENANT}/${AGENT}
-After=network-online.target
+After=network-online.target vllm-internal-network.service
 Wants=network-online.target
 
 [Pod]
 PodName=${TENANT}-${AGENT}
+Network=vllm-internal.network
 
 [Install]
 WantedBy=default.target

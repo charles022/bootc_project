@@ -17,6 +17,15 @@ Environment=OPENCLAW_NETWORK=${NETWORK}
 Environment=OPENCLAW_MSGBUS_DIR=/run/messaging-bridge
 Environment=OPENCLAW_MSGBUS_INBOUND=/run/messaging-bridge/inbound.sock
 Environment=OPENCLAW_AGENTCTL_SOCKET=/run/agentctl/agentctl.sock
+# Default inference endpoint. The runtime reaches vLLM as DNS name `vllm`
+# on the vllm-internal network attached to its pod. The API key is not
+# baked in: the runtime requests credential id `vllm` from the local
+# credential-proxy, which only succeeds if openclaw-broker has granted
+# this agent access. See docs/concepts/inference_stack.md.
+Environment=OPENAI_BASE_URL=http://vllm:8000/v1
+Environment=OPENAI_API_BASE=http://vllm:8000/v1
+Environment=OPENCLAW_INFERENCE_ENDPOINT=http://vllm:8000/v1
+Environment=OPENCLAW_INFERENCE_CREDENTIAL_ID=vllm
 Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
 Volume=${TENANT_HOME}/agents/${AGENT}/msgbus:/run/messaging-bridge:Z
 ReadOnly=true

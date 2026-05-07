@@ -1,0 +1,24 @@
+# Internal podman network for the shared vLLM inference service.
+#
+# Tenants attach their agent pods to this network and reach vLLM as the
+# DNS name `vllm` on port 8000. The network has no default route to the
+# host or the internet, so the only thing reachable from inside is vLLM
+# (and any other pod on the same network). Authentication is enforced by
+# vLLM's --api-key, brokered per-tenant via openclaw-broker.
+#
+# East-west traffic between pods on this network is not blocked by podman
+# itself, but agent runtime containers expose no listening sockets — all
+# their interaction with vLLM is outbound HTTP. See
+# docs/concepts/inference_stack.md for the threat model.
+
+[Unit]
+Description=Internal podman network for shared vLLM inference
+
+[Network]
+NetworkName=vllm-internal
+Internal=true
+DisableDNS=false
+Subnet=10.89.42.0/24
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,56 @@
+# Shared vLLM inference service (host-managed Quadlet).
+#
+# One vLLM process serves every tenant agent. Isolation between tenants
+# rests on three layers:
+#   1) Network: vllm-internal is the only network vLLM listens on. It has
+#      no default route, so vLLM is unreachable from the public network.
+#   2) Auth:    vLLM is started with --api-key $VLLM_API_KEY (sourced from
+#      /etc/openclaw-platform/vllm.env, generated at first boot by
+#      vllm-bootstrap.service). Per-tenant grants are mediated by
+#      openclaw-broker — agents fetch the key through credential-proxy.
+#   3) Process hardening: read-only rootfs, NoNewPrivileges, all caps
+#      dropped, ephemeral /tmp, model cache on a dedicated named volume.
+#
+# GPU access is via CDI generated at runtime by nvidia-cdi-refresh.service
+# (see docs/concepts/gpu_stack.md). Do not hardcode device paths here.
+
+[Unit]
+Description=Shared vLLM OpenAI-compatible inference service
+After=network-online.target nvidia-cdi-refresh.service vllm-bootstrap.service vllm-internal-network.service
+Wants=network-online.target
+Requires=nvidia-cdi-refresh.service vllm-bootstrap.service vllm-internal-network.service
+
+[Container]
+# Upstream OpenAI-compatible vLLM server. Pin a tag in production by
+# editing /etc/openclaw-platform/vllm.env (VLLM_IMAGE=...) and reloading.
+Image=docker.io/vllm/vllm-openai:latest
+ContainerName=vllm
+Network=vllm-internal.network
+# Intentionally no PublishPort — vLLM listens only on vllm-internal:8000.
+EnvironmentFile=/etc/openclaw-platform/vllm.env
+# GPU through CDI, mirroring the dev-container pattern.
+AddDevice=nvidia.com/gpu=all
+# Hardening — vLLM does not need write access to its rootfs.
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+# vLLM and its CUDA runtime need scratch space; tmpfs keeps it ephemeral.
+Tmpfs=/tmp:size=2g,mode=1777
+Tmpfs=/dev/shm:size=8g,mode=1777
+# Persist the HuggingFace model cache so restarts don't re-download.
+Volume=vllm-models.volume:/root/.cache/huggingface:Z
+Environment=HF_HOME=/root/.cache/huggingface
+Environment=HUGGING_FACE_HUB_TOKEN=
+# Run the OpenAI-compatible server. Model and api-key come from the env
+# file; --api-key on the CLI takes precedence over the env var inside
+# vLLM, so we pass it explicitly to make the requirement obvious.
+Exec=--model ${VLLM_MODEL} --host 0.0.0.0 --port 8000 --api-key ${VLLM_API_KEY} --max-num-seqs ${VLLM_MAX_NUM_SEQS} --gpu-memory-utilization ${VLLM_GPU_MEMORY_UTILIZATION}
+
+[Service]
+Restart=on-failure
+RestartSec=15s
+# vLLM model load is slow; give it room before systemd flags it failed.
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

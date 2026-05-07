@@ -125,15 +125,32 @@ When `platformctl tenant create <tenant>` runs, it renders Quadlet templates int
 
 These run **as the tenant service account**, not as root. Inspect them with `systemctl --user --machine=tenant_<tenant>@ list-units`. See `reference/tenant_quadlets.md`.
 
+### vllm-bootstrap.service
+- **Path**: `/usr/lib/systemd/system/vllm-bootstrap.service`
+- **Type**: oneshot service
+- **Purpose**: Generates `/etc/openclaw-platform/vllm.env` with a fresh API key and defaults the first time the host boots. Idempotent (`ConditionPathExists=!`).
+- **Triggers**: Starts at boot before `vllm.service`.
+- **Implements**: `/usr/local/bin/vllm-bootstrap.sh`
+- **Enabled at build time?**: Yes
+
+### vllm.service (Quadlet-generated)
+- **Generated from**: `/usr/share/containers/systemd/vllm.container`
+- **Purpose**: Runs the shared vLLM OpenAI-compatible inference service on the `vllm-internal` podman network.
+- **Triggers**: Started at boot via the Quadlet `[Install] WantedBy=multi-user.target`. Depends on `nvidia-cdi-refresh.service` and `vllm-bootstrap.service`.
+- **Notes**: See `concepts/inference_stack.md` for the full design and `reference/vllm_quadlet.md` for fields.
+
 ## Boot order
 
 On a typical first boot of a new deployment, units activate in this approximate sequence:
 
 1. **`cloud-init.target`**: Processes any provided user data or SSH keys.
 2. **`nvidia-cdi-refresh.service`**: Generates the CDI spec once drivers and device nodes are ready.
-3. **`devpod.service`**: (Generated from Quadlet) Starts the dev pod once Podman and CDI are available.
-4. **`sshd.service`**: Enables remote access.
-5. **`openclaw-broker.service`**: Opens the admin socket and per-tenant sockets so tenant pods' credential-proxy sidecars can reach it.
-6. **`openclaw-provisioner.service`**: Opens its own admin and per-tenant sockets (after the broker) so tenant pods' openclaw-runtime containers can call `agentctl`.
-7. **`bootc-host-test.service`**: Validates the health of the entire stack.
-8. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.
+3. **`vllm-bootstrap.service`**: Writes the vLLM env file with a fresh API key (first boot only).
+4. **`vllm-internal-network.service`**: Quadlet-generated; creates the internal podman network.
+5. **`vllm.service`**: Quadlet-generated; starts the shared vLLM inference service.
+6. **`devpod.service`**: (Generated from Quadlet) Starts the dev pod once Podman and CDI are available.
+7. **`sshd.service`**: Enables remote access.
+8. **`openclaw-broker.service`**: Opens the admin socket and per-tenant sockets so tenant pods' credential-proxy sidecars can reach it.
+9. **`openclaw-provisioner.service`**: Opens its own admin and per-tenant sockets (after the broker) so tenant pods' openclaw-runtime containers can call `agentctl`.
+10. **`bootc-host-test.service`**: Validates the health of the entire stack.
+11. **`bootc-firstboot-push.service`**: Pushes the verified image to Quay if requested by configuration.
