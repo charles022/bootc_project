@@ -1,3 +1,9 @@
+## Absolute requirement
+
+We want to add a vLLM container to this project. There will be a single vLLM container, managed by the host, and used by the tenant OpenClaw agents. The following is a proposal for how it should be implemented.
+
+---
+
 ## Recommended design
 
 Use **one shared vLLM container as a local OpenAI-compatible HTTP API server**, then point each tenant’s Codex CLI / OpenClaw environment at that API endpoint.
@@ -44,7 +50,6 @@ This gives you:
 | Efficiency          | Model weights loaded once, GPU shared by vLLM scheduler        |
 | Tenant simplicity   | Tenants use the same protocol as remote OpenAI-compatible APIs |
 | Isolation           | Tenants do not get GPU device access directly                  |
-| Host safety         | vLLM is the only container with GPU access                     |
 | Operational clarity | Host starts vLLM; tenants consume it                           |
 
 vLLM’s official container documentation shows the OpenAI-compatible image and Podman GPU example using `--device nvidia.com/gpu=all`, port `8000`, and `--ipc=host` or `--shm-size` for PyTorch shared memory behavior. ([vLLM][2])
