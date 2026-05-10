@@ -33,10 +33,10 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 ### `02_build_vm/build_vm.sh`
 - **Path**: `02_build_vm/build_vm.sh`
 - **Purpose**: Converts the host image into a bootable `qcow2` virtual disk and installs it into the libvirt storage pool.
-- **Env vars / args**: `IMAGE_NAME` (optional arg, defaults to `gpu-bootc-host:latest`), `VM_NAME` (optional env var), `SSH_PUB_KEY_FILE` (optional env var).
+- **Env vars / args**: `IMAGE_NAME` (optional arg, defaults to `quay.io/m0ranmcharles/fedora_init:latest`), `VM_NAME` (optional env var), `SSH_PUB_KEY_FILE` (optional env var).
 - **Preconditions**: Requires `bootc-image-builder`, `libvirt`, and `sudo` access.
 - **Side effects**: Generates a `config.toml` with injected SSH keys, creates a `qcow2` image, and copies it to `/var/lib/libvirt/images/`.
-- **Notes**: Automatically detects and injects the local user's SSH public key into the VM's `root` account. The script pipes the host image through `podman save | sudo podman load` because rootful `bootc-image-builder` reads from root's container storage, which is a separate path from the user's rootless storage; without the hand-off, the rootful builder cannot see a rootless-built image.
+- **Notes**: Automatically detects and injects the local user's SSH public key into the VM's `root` account. The default Quay tag gives the installed VM a real registry source for `bootc status` and later update testing. Pass `gpu-bootc-host:latest` explicitly to build from the unqualified local tag instead. The script pipes the host image through `podman save | sudo podman load` because rootful `bootc-image-builder` reads from root's container storage, which is a separate path from the user's rootless storage; without the hand-off, the rootful builder cannot see a rootless-built image.
 
 ### `02_build_vm/run_vm.sh`
 - **Path**: `02_build_vm/run_vm.sh`

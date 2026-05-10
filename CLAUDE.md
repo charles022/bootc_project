@@ -31,9 +31,10 @@ Push all three images to Quay:
 
 Build the VM disk image (qcow2) from the host OCI image:
 ```bash
-./02_build_vm/build_vm.sh [IMAGE_NAME]   # defaults to gpu-bootc-host:latest
+./02_build_vm/build_vm.sh [IMAGE_NAME]   # defaults to quay.io/m0ranmcharles/fedora_init:latest
 ```
 - Auto-detects `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`; override with `SSH_PUB_KEY_FILE=`.
+- Defaults to the Quay host image tag so the installed VM tracks a real registry source in `bootc status`; pass `gpu-bootc-host:latest` explicitly to test an unpushed local build.
 - Pipes the image into root's container storage (`podman save | sudo podman load`) before calling `bootc-image-builder`, because `sudo podman` uses a separate storage path from the rootless build.
 - Generates `./output/config.toml` with a `[[customizations.user]]` entry injecting the SSH key, passes `--rootfs xfs --config /config.toml` to bootc-image-builder.
 - Copies the produced qcow2 to `/var/lib/libvirt/images/${VM_NAME}.qcow2` (the libvirt storage pool) so QEMU's system user can read it.

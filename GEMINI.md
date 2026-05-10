@@ -35,7 +35,9 @@ The project uses `bootc-image-builder` to convert the bootable container into a 
   ```bash
   ./02_build_vm/build_vm.sh [IMAGE_NAME]
   ```
-  *Defaults to `gpu-bootc-host:latest`. Converts the OCI image to qcow2 via
+  *Defaults to `quay.io/m0ranmcharles/fedora_init:latest` so the VM tracks
+  a real registry source. Pass `gpu-bootc-host:latest` explicitly to test
+  an unpushed local build. Converts the OCI image to qcow2 via
   `bootc-image-builder` and installs it into the libvirt storage pool.*
 - **Run VM**:
   ```bash

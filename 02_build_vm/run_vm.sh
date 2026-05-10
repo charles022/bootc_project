@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 VM_NAME="${VM_NAME:-gpu-bootc-test}"
 SSH_CONFIG="${HOME}/.ssh/config"
 
-. "$(dirname "$0")/_detect_ssh_key.sh"
+. ./_detect_ssh_key.sh
 SSH_KEY_FILE="${SSH_PUB_KEY_FILE%.pub}"
 
 DISK_DEST="/var/lib/libvirt/images/${VM_NAME}.qcow2"

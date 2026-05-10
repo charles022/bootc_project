@@ -20,9 +20,15 @@ Run the build script from the repository root:
 
 This script performs the following:
 - Detects your SSH public key and generates a temporary `config.toml` to inject it into the VM's root account.
-- Invokes `bootc-image-builder` to convert the `gpu-bootc-host:latest` image (or a specified image name) into a qcow2 file.
+- Invokes `bootc-image-builder` to convert the `quay.io/m0ranmcharles/fedora_init:latest` image (or a specified image name) into a qcow2 file.
 - Copies the resulting disk to `/var/lib/libvirt/images/${VM_NAME}.qcow2` (default `VM_NAME=gpu-bootc-test`).
 - Sets the file ownership to `qemu:qemu` so the virtualization service can access it.
+
+The Quay tag is the default so the installed VM tracks a real registry source in `bootc status`. To test an unpushed local build instead, pass the local tag explicitly:
+
+```bash
+./02_build_vm/build_vm.sh gpu-bootc-host:latest
+```
 
 ### 2. Boot the VM and configure SSH
 Start the VM and set up the local SSH alias:

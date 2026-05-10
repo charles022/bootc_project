@@ -7,10 +7,10 @@ set -euo pipefail
 # of where the caller is.
 cd "$(dirname "$0")"
 
-IMAGE_NAME="${1:-gpu-bootc-host:latest}"
+IMAGE_NAME="${1:-quay.io/m0ranmcharles/fedora_init:latest}"
 VM_NAME="${VM_NAME:-gpu-bootc-test}"
 
-. "$(dirname "$0")/_detect_ssh_key.sh"
+. ./_detect_ssh_key.sh
 SSH_PUB_KEY="$(cat "${SSH_PUB_KEY_FILE}")"
 echo "=== Using SSH public key: ${SSH_PUB_KEY_FILE}"
 
@@ -34,6 +34,12 @@ EOF
 echo "=== Loading ${IMAGE_NAME} into root container storage ==="
 podman save "${IMAGE_NAME}" | sudo podman load
 
+if [[ "${IMAGE_NAME}" == */* ]]; then
+  BUILDER_IMAGE_REF="${IMAGE_NAME}"
+else
+  BUILDER_IMAGE_REF="localhost/${IMAGE_NAME}"
+fi
+
 echo "=== Converting ${IMAGE_NAME} to qcow2 ==="
 sudo podman run \
   --rm \
@@ -45,7 +51,7 @@ sudo podman run \
   --type qcow2 \
   --rootfs xfs \
   --config /config.toml \
-  --local "localhost/${IMAGE_NAME}"
+  --local "${BUILDER_IMAGE_REF}"
 
 # --- Install disk into the libvirt storage pool ---
 # QEMU runs as the system 'qemu' user and cannot read files under /home.
