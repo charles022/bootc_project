@@ -24,13 +24,13 @@ vLLM is explicitly built to expose an OpenAI-compatible server, including `/v1/c
 
 ## Run vLLM as a **host-managed shared service**
 
-Do **not** run one vLLM instance per tenant. Run **one** vLLM container under a dedicated non-login service account, for example:
+Do **not** run one vLLM instance per tenant. Run **one** vLLM container as a system-level host Quadlet, for example:
 
 ```text
 host admin user
 └── systemd
     └── vllm.service / vllm.container
-        └── rootless Podman container
+        └── system-level Podman container
             └── vLLM OpenAI-compatible API
 ```
 
@@ -120,68 +120,66 @@ tenant:  calls host-local vLLM endpoint
 
 # Suggested concrete setup
 
-## 1. vLLM service account
+## 1. vLLM service account and storage
 
-Create a dedicated service account for the model server:
+Since the host is an immutable bootc image, the `vllm` service account must be baked into the image during the build process (e.g., via `sysusers.d` or a `RUN useradd` instruction in the `Containerfile`). It should not be created imperatively on the running host.
 
-```bash
-sudo useradd \
-  --system \
-  --create-home \
-  --home-dir /var/lib/vllm \
-  --shell /usr/sbin/nologin \
-  vllm
-```
-
-Enable lingering if you want the user-level systemd service to start at boot:
-
-```bash
-sudo loginctl enable-linger vllm
-```
-
-The vLLM account owns only:
+The vLLM service will use the platform's persistent storage layout:
 
 ```text
-/var/lib/vllm/
+/var/lib/openclaw-platform/vllm-cache/
 ├── .cache/huggingface/
-├── quadlets/
 └── logs/
 ```
 
-Tenant users should not own or modify the vLLM container.
+Tenant users should not own or modify the vLLM container or its cache.
 
 ---
 
-## 2. Run vLLM with Podman
+## 2. Run vLLM via System Quadlet
 
-A direct test command:
+Since rootless CDI is not yet validated in this architecture, vLLM should be run as a system-level Quadlet (`/etc/containers/systemd/vllm.container`) to guarantee GPU injection works correctly via the bootc CDI bridge.
 
-```bash
-sudo -u vllm podman run --rm \
-  --name vllm-openai \
-  --device nvidia.com/gpu=all \
-  --security-opt label=disable \
-  --ipc=host \
-  -p 127.0.0.1:8000:8000 \
-  -v /var/lib/vllm/.cache/huggingface:/root/.cache/huggingface:Z \
-  -e HF_TOKEN \
-  docker.io/vllm/vllm-openai:latest \
-  --model Qwen/Qwen3-14B \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --api-key "$VLLM_API_KEY" \
-  --generation-config vllm
+```ini
+[Unit]
+Description=vLLM OpenAI-compatible API Server
+After=nvidia-cdi-refresh.service
+Requires=nvidia-cdi-refresh.service
+
+[Container]
+Image=docker.io/vllm/vllm-openai:latest
+ContainerName=vllm-openai
+User=vllm
+Group=vllm
+
+# Networking
+PublishPort=127.0.0.1:8000:8000
+PodmanArgs=--ipc=host
+
+# GPU Injection (Relies on CDI)
+PodmanArgs=--device=nvidia.com/gpu=all
+PodmanArgs=--security-opt=label=disable
+
+# Storage
+Volume=/var/lib/openclaw-platform/vllm-cache/.cache/huggingface:/root/.cache/huggingface:Z
+
+# Environment and Execution
+Environment=HF_TOKEN=your-token-here
+Exec=--model Qwen/Qwen3-14B --host 0.0.0.0 --port 8000 --api-key "${VLLM_API_KEY}" --generation-config vllm
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 Notes:
 
+* `After/Requires=nvidia-cdi-refresh.service` ensures the CDI spec is generated before the container starts.
+* `User=vllm` runs the container process under the dedicated `vllm` service account even though the Quadlet is system-managed.
 * `--host 0.0.0.0` is inside the container.
-* `-p 127.0.0.1:8000:8000` keeps the service bound only to host loopback.
+* `PublishPort=127.0.0.1:8000:8000` keeps the service bound only to host loopback.
 * `--api-key` makes clients send a bearer token.
 * `--generation-config vllm` avoids silently inheriting generation defaults from the Hugging Face model repo; vLLM documents that Hugging Face `generation_config.json` can override sampling defaults unless disabled. ([vLLM][1])
 * `--ipc=host` is recommended by vLLM docs as one option because PyTorch uses shared memory between processes; alternatively use `--shm-size`. ([vLLM][2])
-
-For production, put that behind a Quadlet or systemd unit.
 
 ---
 
@@ -352,11 +350,12 @@ Host
 ├── admin user
 │   └── manages system
 │
-├── vllm service account
-│   └── rootless vLLM container
-│       ├── has GPU
-│       ├── has model cache
-│       └── exposes 127.0.0.1:8000
+├── systemd (host level)
+│   └── vllm.container Quadlet
+│       └── system-level Podman container (running as vllm user)
+│           ├── has GPU
+│           ├── has model cache
+│           └── exposes 127.0.0.1:8000
 │
 ├── tenant-a service account
 │   └── rootless tenant container
@@ -497,7 +496,7 @@ host secrets
 
 # The answer in one sentence
 
-Run **one shared rootless vLLM container under a dedicated service account**, publish its OpenAI-compatible API only to **host loopback**, and configure every tenant’s Codex CLI / OpenClaw container to use that endpoint as its `OPENAI_BASE_URL`, with tenant containers remaining isolated and never receiving direct GPU access.
+Run **one shared vLLM container via a system-level host Quadlet** under a baked-in service account, publish its OpenAI-compatible API only to **host loopback**, and configure every tenant’s Codex CLI / OpenClaw container to use that endpoint as its `OPENAI_BASE_URL`, with tenant containers remaining isolated and never receiving direct GPU access.
 
 [1]: https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html "OpenAI-Compatible Server - vLLM"
 [2]: https://docs.vllm.ai/en/stable/deployment/docker/ "Using Docker - vLLM"
