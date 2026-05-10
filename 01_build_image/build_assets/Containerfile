@@ -69,6 +69,14 @@ COPY devpod.yaml /usr/share/containers/systemd/devpod.yaml
 COPY backup.container /usr/share/containers/systemd/backup.container
 COPY backup.timer /usr/lib/systemd/system/backup.timer
 
+# Host-managed vLLM OpenAI-compatible API server. Runs as a system Quadlet
+# under a baked-in `vllm` system user; published only on host loopback so
+# rootless tenant containers can reach it via host.containers.internal.
+# See docs/reference/vllm.md.
+COPY vllm.container /usr/share/containers/systemd/vllm.container
+COPY vllm.sysusers.conf /usr/lib/sysusers.d/vllm.conf
+COPY vllm.tmpfiles.conf /usr/lib/tmpfiles.d/vllm.conf
+
 # --- Multi-tenant layer (additive) ---
 # See docs/concepts/multi_tenant_architecture.md for the design.
 # The host ships:
@@ -102,6 +110,7 @@ RUN install -d -m 0755 \
         /var/lib/openclaw-platform/provisioner \
         /var/lib/openclaw-platform/backups \
         /var/lib/openclaw-platform/tenants \
+        /var/lib/openclaw-platform/vllm-cache \
         /etc/containers/systemd/users
 COPY multi_tenant/tenant-onboard.pod.tmpl                 /var/lib/openclaw-platform/templates/quadlet/tenant-onboard.pod.tmpl
 COPY multi_tenant/tenant-cloudflared.container.tmpl       /var/lib/openclaw-platform/templates/quadlet/tenant-cloudflared.container.tmpl
@@ -151,4 +160,5 @@ RUN systemctl enable sshd \
     && systemctl enable bootc-firstboot-push.service \
     && systemctl enable openclaw-broker.service \
     && systemctl enable openclaw-provisioner.service \
-    && systemctl enable backup.timer
+    && systemctl enable backup.timer \
+    && systemctl enable vllm.service

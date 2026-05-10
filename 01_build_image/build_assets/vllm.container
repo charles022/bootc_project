@@ -1,0 +1,25 @@
+[Unit]
+Description=vLLM OpenAI-compatible API server
+After=network-online.target nvidia-cdi-refresh.service
+Wants=network-online.target
+Requires=nvidia-cdi-refresh.service
+
+[Container]
+Image=docker.io/vllm/vllm-openai:latest
+ContainerName=vllm-openai
+User=vllm
+Group=vllm
+PublishPort=127.0.0.1:8000:8000
+PodmanArgs=--ipc=host
+PodmanArgs=--device=nvidia.com/gpu=all
+PodmanArgs=--security-opt=label=disable
+Volume=/var/lib/openclaw-platform/vllm-cache:/home/vllm/.cache:Z
+Secret=hf-token,type=env,target=HF_TOKEN
+Exec=--model Qwen3-8B-Q4_K_M --host 0.0.0.0 --port 8000 --generation-config vllm
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

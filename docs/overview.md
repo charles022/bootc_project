@@ -30,6 +30,7 @@ The system splits responsibility across three distinct layers:
 **Today:**
 - Host image build pipeline.
 - Tenant agent dev environment image and legacy dev pod fallback; backup service Quadlet + timer.
+- Shared host-managed vLLM OpenAI-compatible API server (loopback-bound) that tenant agents use as their default model endpoint. See `reference/vllm.md`.
 - VM build path (qcow2 conversion with SSH key injection).
 - Image push to Quay.
 - GPU CDI plumbing and dynamic boot-time generation.

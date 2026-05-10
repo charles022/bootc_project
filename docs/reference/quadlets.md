@@ -155,3 +155,36 @@ WantedBy=timers.target
 
 * `Persistent=true` catches up a missed run if the host was powered off at the scheduled time.
 * Only `backup.timer` is enabled; `backup.service` is activated on demand by the timer, not at every boot.
+
+---
+
+## vllm.container
+
+The host-managed vLLM OpenAI-compatible API server. Single shared instance, used by every tenant agent by default. Bound to host loopback only.
+
+* **Path in repo:** `01_build_image/build_assets/vllm.container`
+* **Path in host image:** `/usr/share/containers/systemd/vllm.container`
+* **Type:** Standalone `.container` Quadlet unit.
+* **Generated systemd unit:** `vllm.service`.
+
+```ini
+[Unit]
+After=network-online.target nvidia-cdi-refresh.service
+Requires=nvidia-cdi-refresh.service
+
+[Container]
+Image=docker.io/vllm/vllm-openai:latest
+User=vllm
+Group=vllm
+PublishPort=127.0.0.1:8000:8000
+PodmanArgs=--device=nvidia.com/gpu=all
+Volume=/var/lib/openclaw-platform/vllm-cache:/home/vllm/.cache:Z
+Secret=hf-token,type=env,target=HF_TOKEN
+Exec=--model Qwen3-8B-Q4_K_M --host 0.0.0.0 --port 8000 --generation-config vllm
+
+[Install]
+WantedBy=multi-user.target
+```
+
+* `User=vllm` runs container PID 1 as the unprivileged system user baked in by `vllm.sysusers.conf`.
+* The model is pinned in `Exec=`; switching models requires a host image rebuild. See `reference/vllm.md`.

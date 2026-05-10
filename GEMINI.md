@@ -20,7 +20,7 @@ This project, titled "Bootc System Migration," focuses on moving from a traditio
 ## Building and Running
 
 ### Build Flow
-The build process involves three layers: the dev container, the backup service (a standalone host Quadlet, not a pod sidecar), and finally the bootc host image that integrates them.
+The build process involves three locally-built layers: the dev container, the backup service (a standalone host Quadlet, not a pod sidecar), and finally the bootc host image that integrates them. The host image additionally pulls the upstream `docker.io/vllm/vllm-openai:latest` image at boot and runs it as a system Quadlet (`vllm.container`) under a baked-in `vllm` system user; it serves an OpenAI-compatible API on `127.0.0.1:8000` and is the default model endpoint for tenant agents. See `docs/reference/vllm.md`.
 
 - **Build Images**:
   ```bash

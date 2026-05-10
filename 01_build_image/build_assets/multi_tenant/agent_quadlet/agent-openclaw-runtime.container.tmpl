@@ -17,6 +17,9 @@ Environment=OPENCLAW_NETWORK=${NETWORK}
 Environment=OPENCLAW_MSGBUS_DIR=/run/messaging-bridge
 Environment=OPENCLAW_MSGBUS_INBOUND=/run/messaging-bridge/inbound.sock
 Environment=OPENCLAW_AGENTCTL_SOCKET=/run/agentctl/agentctl.sock
+Environment=OPENAI_BASE_URL=http://host.containers.internal:8000/v1
+Environment=OPENAI_MODEL=Qwen3-8B-Q4_K_M
+Environment=OPENAI_API_KEY=local-vllm
 Volume=/run/openclaw-provisioner/tenants/${TENANT}.sock:/run/agentctl/agentctl.sock:ro,Z
 Volume=${TENANT_HOME}/agents/${AGENT}/msgbus:/run/messaging-bridge:Z
 ReadOnly=true

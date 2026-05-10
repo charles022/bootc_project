@@ -41,6 +41,10 @@ The CDI specification at `/etc/cdi/nvidia.yaml` maps actual device files and lib
 
 The CUDA toolkit, cuDNN, and ML frameworks live entirely inside the tenant dev environment (currently `quay.io/m0ranmcharles/fedora_init:dev-env`, built from `nvcr.io/nvidia/pytorch:26.03-py3`). Only the userspace CUDA bits go here. The backup service runs as a separate host Quadlet and does not require GPU tools. The legacy system dev container uses the same base while rootless tenant CDI is validated.
 
+### vLLM (second CDI consumer)
+
+The host-managed `vllm.container` Quadlet is the second consumer of `/etc/cdi/nvidia.yaml` after `devpod`. It requests the GPU through `PodmanArgs=--device=nvidia.com/gpu=all`, the same selector documented for `podman run` with CDI. Because `vllm.service` declares `Requires=nvidia-cdi-refresh.service`, it is also a real-hardware validation point for the CDI pipeline on first boot. See `reference/vllm.md`.
+
 ## Tenant CDI path and legacy fallback
 
 The tenant agent dev environment is rendered from `agent-dev-env.container.tmpl` as a rootless `.container` Quadlet under `/etc/containers/systemd/users/<UID>/`. It requests the host GPU with:

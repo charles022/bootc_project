@@ -68,6 +68,8 @@ Three layers, built independently, integrated via Quadlet:
 
 3. **Backup service** (`backup-container.Containerfile`) — Fedora 42 base; runs as a standalone host Quadlet (`backup.container`) activated by `backup.timer`; no real backup logic yet.
 
+4. **vLLM API server** — upstream `docker.io/vllm/vllm-openai:latest` image, run as a system Quadlet (`vllm.container`) under a baked-in `vllm` system user. Bound to `127.0.0.1:8000` only; consumed by tenant agents via `host.containers.internal:8000`. Model is pinned in the Quadlet (`Qwen3-8B-Q4_K_M`); switching models is a host-image change. No `--api-key` — loopback bind is the boundary. Tenant external-provider keys are *not* routed through the platform broker; tenants store their own in their rootless `podman secret` store. See `docs/reference/vllm.md`.
+
 The dev container runs as a pod defined by `devpod.yaml`, managed by the `devpod.kube` Quadlet. The backup service runs as a separate host Quadlet activated by `backup.timer`. At boot: systemd starts `nvidia-cdi-refresh.service` (generates `/etc/cdi/nvidia.yaml` via `nvidia-ctk cdi generate`) → Quadlet generator turns `devpod.kube` into a `devpod.service` → pod starts with `nvidia.com/gpu=all` GPU access via CDI.
 
 ### Ownership rules (enforced across this codebase)
