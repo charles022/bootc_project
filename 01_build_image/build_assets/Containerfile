@@ -24,6 +24,12 @@ RUN dnf -y install 'dnf5-command(config-manager)' \
        python3-cryptography \
     && dnf clean all
 
+# NVIDIA 590.48.01 does not build against Linux 6.19 without small source
+# compatibility fixes. Patch the DKMS source before first boot attempts to
+# build the host kernel module.
+COPY patch_nvidia_619.py /usr/local/libexec/patch_nvidia_619.py
+RUN python3 /usr/local/libexec/patch_nvidia_619.py
+
 # Create only the directories we need in the host image.
 RUN mkdir -p /usr/share/containers/systemd \
     && mkdir -p /usr/lib/systemd/system \
@@ -160,5 +166,4 @@ RUN systemctl enable sshd \
     && systemctl enable bootc-firstboot-push.service \
     && systemctl enable openclaw-broker.service \
     && systemctl enable openclaw-provisioner.service \
-    && systemctl enable backup.timer \
-    && systemctl enable vllm.service
+    && systemctl enable backup.timer

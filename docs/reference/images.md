@@ -10,7 +10,7 @@ The primary bootable container image containing the kernel, drivers, and system 
 - **Purpose**: Provides the immutable host operating system for bare metal or virtual machines.
 - **Base image**: `quay.io/fedora/fedora-bootc:42`
 - **Key adds**:
-    - **NVIDIA Stack**: `nvidia-open` (open kernel modules), `nvidia-container-toolkit`.
+    - **NVIDIA Stack**: `nvidia-open` (open kernel modules), `nvidia-container-toolkit`, and a local Linux 6.19 DKMS source compatibility patch.
     - **Container Tools**: `podman`, `skopeo`.
     - **Management**: `cloud-init` (first-boot configuration), `openssh-server`.
     - **Update Pipeline**: `bootc-update.*` (systemd units and scripts for weekly rebuilds).
@@ -19,7 +19,7 @@ The primary bootable container image containing the kernel, drivers, and system 
     - Local: `gpu-bootc-host:latest`
     - Quay: `quay.io/m0ranmcharles/fedora_init:latest`
 - **Baked-in vs. pulled at runtime**: Baked-in as the system image.
-- **Notes**: The host image is keyless; SSH keys and user credentials must be injected at deployment time (e.g., via `cloud-init`).
+- **Notes**: The host image is keyless; SSH keys and user credentials must be injected at deployment time (e.g., via `cloud-init`). `patch_nvidia_619.py` patches the NVIDIA 590 DKMS source before first boot so the open UVM module builds against Fedora 42's Linux 6.19 kernel headers.
 
 ## Dev container
 

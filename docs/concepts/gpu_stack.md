@@ -93,7 +93,7 @@ injects /dev/nvidia* into pod
 
 ### DKMS at build time
 
-The `nvidia-open` package builds the kernel module via DKMS during `dnf install`, pinning against the bootc base image's running kernel. If the deployed host runs a different kernel, the module will not load. The fallback paths are either installing `kernel-devel` matching the base image's kernel, or swapping to RPM Fusion's `akmod-nvidia-open` to trigger the build at first boot.
+The `nvidia-open` package provides DKMS source for the host kernel module. Fedora 42's Linux 6.19 kernel changed the HMM / device-page APIs used by NVIDIA 590.48.01, so the host image runs `patch_nvidia_619.py` during the image build to patch `/usr/src/nvidia-*` before first boot attempts `dkms autoinstall`. Remove that patch once the packaged driver source carries the 6.19 fixes. If the deployed host later runs a different incompatible kernel, the fallback paths are either installing `kernel-devel` matching the base image's kernel, carrying the matching source patch, or swapping to RPM Fusion's `akmod-nvidia-open` to trigger the build at first boot.
 
 ### Why `nvidia-open` over the alternatives
 

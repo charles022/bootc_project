@@ -38,10 +38,15 @@ Start the VM and set up the local SSH alias:
 ```
 
 This script performs the following:
-- Tears down any existing VM with the same name.
-- Starts a new VM with 16 GB RAM, 8 vCPUs, UEFI boot, and a virtio network interface.
-- Polls `virsh domifaddr` until the VM receives an IP address from the default libvirt network.
+- Reuses an existing VM with the same name, or starts a new VM with 16 GB RAM, 8 vCPUs, UEFI boot, and a virtio network interface.
+- Polls `virsh domifaddr --source lease` until the VM receives an IP address from the default libvirt network.
 - Updates your `~/.ssh/config` file with a `# BEGIN fedora-init` block, enabling you to connect using a simple alias.
+
+Set `RECREATE_VM=1` to destroy and recreate an existing VM. If libvirt reports an IP after the script times out, rerun the script with `VM_IP=<ip>` to write the SSH alias without hunting through `~/.ssh/config` by hand:
+
+```bash
+SSH_PUB_KEY_FILE="${HOME}/.ssh/id_ed25519_7510.pub" VM_IP=192.168.122.248 ./02_build_vm/run_vm.sh
+```
 
 ### 3. Connect
 Once the script completes, connect to the running VM:
@@ -56,6 +61,6 @@ ssh fedora-init
 - **Deployment**: Run `bootc status` to verify the VM is running the expected image version and is tracking the correct registry.
 
 ## Troubleshooting
-- **IP not detected**: If the script times out waiting for an IP, attach to the console with `sudo virsh console gpu-bootc-test` (detach with `Ctrl+]`) to inspect the boot logs. You can also run `sudo virsh domifaddr gpu-bootc-test` manually.
+- **IP not detected**: If the script times out waiting for an IP, run `sudo virsh domifaddr gpu-bootc-test`. If it reports an IPv4 address, rerun `run_vm.sh` with `VM_IP=<ip>` to write the `fedora-init` alias. If no address appears, attach to the console with `sudo virsh console gpu-bootc-test` (detach with `Ctrl+]`) to inspect the boot logs.
 - **Disk not found**: Ensure you ran `build_vm.sh` before `run_vm.sh`. If you customized `VM_NAME`, ensure it was exported consistently for both scripts.
 - **Permission errors**: Confirm your user is in the `libvirt` group or has appropriate `sudo` access. Verify the libvirt daemon is active with `systemctl status libvirtd`.

@@ -41,10 +41,10 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 ### `02_build_vm/run_vm.sh`
 - **Path**: `02_build_vm/run_vm.sh`
 - **Purpose**: Starts the VM using `virt-install`, detects its IP, and configures a local SSH alias.
-- **Env vars / args**: `VM_NAME` (optional env var), `SSH_PUB_KEY_FILE` (optional env var).
+- **Env vars / args**: `VM_NAME` (optional env var), `SSH_PUB_KEY_FILE` (optional env var), `VM_IP` (optional env var to skip IP detection), `VM_IP_TIMEOUT` (optional env var, defaults to `180` seconds), `RECREATE_VM` (optional env var, set to `1` to destroy and recreate an existing VM).
 - **Preconditions**: The VM disk must have been created by `build_vm.sh`.
 - **Side effects**: Destroys any existing VM of the same name, starts a new VM, and modifies `~/.ssh/config`.
-- **Notes**: Creates a `fedora-init` SSH host block with `StrictHostKeyChecking no` to simplify access.
+- **Notes**: Creates a `fedora-init` SSH host block with `StrictHostKeyChecking no` to simplify access. By default, reuses an existing VM and refreshes the SSH alias instead of recreating the domain.
 
 ### `02_build_vm/_detect_ssh_key.sh`
 - **Path**: `02_build_vm/_detect_ssh_key.sh`
@@ -87,6 +87,14 @@ A reference catalog of the shell and Python scripts used to build, deploy, and m
 - **Preconditions**: Run on the host system.
 - **Side effects**: Writes status information and diagnostic data to the system journal.
 - **Notes**: Triggered automatically by `bootc-host-test.service`. It reports host NVIDIA CDI readiness, including `/etc/cdi/nvidia.yaml` permissions, `nvidia.com/gpu=all` selector presence, `nvidia-ctk cdi list` output when available, and the tenant dev-env template's `PodmanArgs=` GPU injection lines. It does not create tenants or agents.
+
+### `patch_nvidia_619.py`
+- **Path**: `/usr/local/libexec/patch_nvidia_619.py` (source: `01_build_image/build_assets/patch_nvidia_619.py`)
+- **Purpose**: Patches NVIDIA 590 DKMS source for Linux 6.19 kernel API compatibility before first boot builds the module.
+- **Env vars / args**: None.
+- **Preconditions**: Run inside the host image build after `nvidia-open` has installed `/usr/src/nvidia-*`.
+- **Side effects**: Modifies the NVIDIA DKMS source tree under `/usr/src/nvidia-*`.
+- **Notes**: Handles the Linux 6.19 `zone_device_page_init` signature change and `dev_pagemap_ops.page_free` to `folio_free` callback change. Remove this script when the packaged NVIDIA driver source carries those fixes.
 
 ### `os-builder.sh`
 - **Path**: `/usr/local/bin/os-builder.sh` (source: `01_build_image/build_assets/os-builder.sh`)
